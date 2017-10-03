@@ -31,7 +31,7 @@ class position(object):
 #            self.log.append([t, price])
         return([t, price, self.profit])
         
-    def openPos(self, t, price, , typePos):
+    def openPos(self, t, price, typePos):
         self.initPrice = price
         self.log.append([t, price])
         self.typePos=typePos

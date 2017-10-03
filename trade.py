@@ -6,7 +6,7 @@ class position(object):
     
     """
     
-    def __init__(self, pair, size = 0, typePos, t, entryPos = 0, exitPos = 0, stopLoss=0):
+    def __init__(self, pair, size = 0, typePos, t, entryPos = 0, exitPos = 0):
         self.status = 'w' #w: waiting, o: open, c:close
         self.pair = pair
         self.initPrice = 0 #open price
@@ -16,7 +16,7 @@ class position(object):
         self.t = t #last ticket
         self.entry = entryPos #price to enter position
         self.exit = exitPos #price to exit position
-        self.stopLoss=stopLoss 
+        #self.stopLoss=stopLoss 
         #self.takeProfit=takeProfit
         self.log = pd.Series([np.NaN, np.NaN],index = ['entry', 'exit'])
         

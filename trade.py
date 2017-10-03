@@ -6,7 +6,7 @@ class position(object):
     
     """
     
-    def __init__(self, pair, size = 0, typePos, t, entryPos = 0, exitPos = 0):
+    def __init__(self, pair, size, typePos, t, entryPos, exitPos):
         self.status = 'w' #w: waiting, o: open, c:close
         self.pair = pair
         self.initPrice = 0 #open price

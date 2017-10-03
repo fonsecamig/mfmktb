@@ -3,8 +3,7 @@ import numpy as np
 import csv
 
 #%%
-#pairlist = ['XXBTZGBP', 'XXBTZUSD', 'XETHZUSD', 'XETHZGBP']
-pairlist = ['XXBTZGBP', 'XETHZUSD']
+pairlist = ['XXBTZGBP', 'XXBTZUSD', 'XETHZUSD', 'XETHZGBP']
 
 filelist = [open('./kraken/' + pair + '.csv', 'r') for pair in pairlist]
 count = dict(zip(pairlist, [sum(1 for line in file)-1 for file in filelist]))

@@ -22,9 +22,9 @@ class position(object):
         
     def profit(self, price):
         if self.typePos == 'l':
-            return(size * (price - self.initPrice))
+            return(self.size * (price - self.initPrice))
         if self.typePos == 's':
-            return(size * (self.initPrice - price))
+            return(self.size * (self.initPrice - price))
     
     def tick(self, t, price):
 #        if self.status == 'o':
@@ -38,7 +38,7 @@ class position(object):
         self.profit = price - self.initPrice
         
     def closePos(self, t, price):
-        if time != self.log[-1][0]:
+        if self.time != self.log[-1][0]:
             self.log.append([t, price])
             self.profit = price - self.initPrice
         self.status = 'c'

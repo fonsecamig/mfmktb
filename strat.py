@@ -20,5 +20,5 @@ class Strategy(object):
 IKH = strategy()
 
 def ind(time, log, period = 86400):
-    postenkansen = argmin(time - 26 * period)
+    postenkansen = argmin(time - 26 * period) # Tenkan Sen position
 

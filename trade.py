@@ -3,7 +3,7 @@ import numpy as np
 #%%
 class position(object):
     """
-    ...
+    ..
     """
     
     def __init__(self, pair, size, typePos, t, entryPos, exitPos, stopLoss, takeProfit):

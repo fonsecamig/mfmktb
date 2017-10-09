@@ -37,13 +37,13 @@ def IKS(timet, logprice, period = 86400, pts = 8, pks = 22, pssb = 52, pahead = 
 #%%
 class IKH(Strategy):
     """
-
+    Ichimoku Kinko Hyo based class
     """
 
     def __init__(self)
         self.params = {period = 86400, pts: pts, pks: pks, pssb: pssb, pahead: pahead}
 
-    def indicator_adv(pos, time):
-        if pos.status = 'o':
-            if pos.type = 'l':
+#    def indicator_adv(pos, time):
+#        if pos.status = 'o':
+#            if pos.type = 'l':
 

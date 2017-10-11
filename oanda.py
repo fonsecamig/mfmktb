@@ -16,10 +16,9 @@ import oandapyV20
 
 def exampleAuth():
     accountID, token = None, None
-    with open("account.txt") as I:
-        accountID = I.read().strip()
-    with open("token.txt") as I:
-        token = I.read().strip()
+    with open("oanda.txt") as I:
+        accountID = I.readline()
+        token = I.readline()
     return accountID, token
 
 # -*- coding: utf-8 -*-

@@ -11,7 +11,7 @@ import oandapyV20
 
 def exampleAuth():
     accountID, token = None, None
-    with open("account.txt") as I:
+    with open("oanda.txt") as I:
         accountID = I.readline()
         token = I.readline()
     return accountID, token

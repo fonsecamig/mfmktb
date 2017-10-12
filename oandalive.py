@@ -12,7 +12,7 @@ import json
 from oandapyV20 import API
 from oandapyV20.exceptions import V20Error, StreamTerminated
 from oandapyV20.endpoints.pricing import PricingStream
-from exampleauth import exampleAuth
+# from exampleauth import exampleAuth
 from requests.exceptions import ConnectionError
 
 # create the top-level parser
@@ -26,7 +26,12 @@ parser.add_argument('--instruments', type=str, nargs='?',
                     action='append', help='instruments')
 
 
-accountID, access_token = exampleAuth()
+def exampleAuth():
+    accountID, token = None, None
+    with open("oanda.txt") as I:
+        accountID = I.readline()
+        token = I.readline()
+    return accountID, token
 
 # commandline args ...
 clargs = parser.parse_args()

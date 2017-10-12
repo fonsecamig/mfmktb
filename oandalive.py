@@ -33,6 +33,8 @@ def exampleAuth():
         token = I.readline()
     return accountID, token
 
+accountID, access_token = exampleAuth()
+
 # commandline args ...
 clargs = parser.parse_args()
 if not clargs.instruments:

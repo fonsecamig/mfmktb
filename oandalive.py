@@ -29,8 +29,8 @@ parser.add_argument('--instruments', type=str, nargs='?',
 def exampleAuth():
     accountID, token = None, None
     with open("oanda.txt") as I:
-        accountID = I.readline()
-        token = I.readline()
+        accountID = I.readline().strip()
+        token = I.readline().strip()
     return accountID, token
 
 accountID, access_token = exampleAuth()

@@ -1,8 +1,7 @@
 # use of the Trades{..} classes
 import json
-import requests
 from oandapyV20 import API
-
+from oandapyV20.contrib.requests import TradeCloseRequest
 
 import oandapyV20.endpoints.trades as trades
 import sys
@@ -15,6 +14,8 @@ def exampleAuth():
     return accountID, token
 
 accountID, access_token = exampleAuth()
+
+print(sys.argv)
 
 chc = sys.argv[1]
 
@@ -41,8 +42,9 @@ if chc == 'details':
 if chc == 'close':
    X = iter(sys.argv[2:])
    for O in X:
-       cfg = { "units": X.next() }
-       r = trades.TradeClose(accountID, tradeID=O, data=cfg)
+       #cfg = { "units": X.__next__() }
+       cfg = TradeCloseRequest(units=X.__next__())
+       r = trades.TradeClose(accountID, tradeID=O, data=cfg.data)
        rv = api.request(r)
        print("RESP:\n{} ".format(json.dumps(rv, indent=2)))
 

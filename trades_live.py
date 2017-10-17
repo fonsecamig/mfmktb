@@ -24,8 +24,6 @@ chc = sys.argv[1]
 
 api = API(access_token=access_token)
 
-params = {"instruments": "EUR_USD,EUR_JPY"}
-
 if chc == 'list':
    r = trades.TradesList(accountID)
    rv = api.request(r)
@@ -92,6 +90,7 @@ if chc == 'streamprice':
             r.terminate("maxrecs records received")
 
 if chc == 'streamtrans':
+    params = {"instruments": "EUR_USD,EUR_JPY"}
     r = trans.TransactionsStream(accountID=accountID)
     rv = api.request(r)
     maxrecs = 5

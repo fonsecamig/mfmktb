@@ -34,14 +34,14 @@ class Translator(object):
     def close(self, pos):
         if pos.broker = "oanda":
             if pos.status = 'w':
-                orders.OrderCancel(accountID = self.accountID, orderID=posID)
+                orders.OrderCancel(accountID = self.accountID, orderID = posID)
                 client.request(r)
                 return (r.response)
-            if pos.tatus = 'o':
+            if pos.status = 'o':
                 data = \
                 {
                     "units": str(vol)
                 }
-                r = trades.TradeClose(accountID=self.accountID, data=data)
+                r = trades.TradeClose(accountID = self.accountID, data = data)
                 client.request(r)
                 print(r.response)

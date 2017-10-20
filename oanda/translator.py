@@ -1,6 +1,6 @@
 import oandapyV20
 
-class Translate(object):
+class Translator(object):
     """
 
     """
@@ -32,7 +32,7 @@ class Translate(object):
             return(r.response)
 
     def close(self, pos):
-        if self.broker = "oanda":
+        if pos.broker = "oanda":
             if pos.status = 'w':
                 orders.OrderCancel(accountID = self.accountID, orderID=posID)
                 client.request(r)
@@ -40,7 +40,7 @@ class Translate(object):
             if pos.tatus = 'o':
                 data = \
                 {
-                    "units": 100
+                    "units": str(vol)
                 }
                 r = trades.TradeClose(accountID=self.accountID, data=data)
                 client.request(r)

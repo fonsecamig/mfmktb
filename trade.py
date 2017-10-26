@@ -50,7 +50,6 @@ class Translator(object):
                 t = pd.Timestamp(OFT["time"], tzinfo = 'UTC')
                 pos = Position(self.broker, posID, pair, iprice, ivol, type, t)
                 pos.status = 'o'
-                pos.trans = self
                 return(pos)
             else:
                 return(None)
@@ -128,8 +127,8 @@ class Position(object):
     #     self.typePos=typePos
     #     self.profit = price - self.initPrice
         
-    def closePos(self, vol = self.log.closedprof[-1]):
-        self.trans.close(self, vol)
+    def closePos(self, vol):
+        trans.close(self, vol)
         # if self.status == 'o':
         #     if vol <= self.tradeVol:
         #         self.orderlog.loc[t] = {'vol': vol, 'price': price, 'clo': }

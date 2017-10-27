@@ -4,8 +4,6 @@ import datetime as dt
 import oandapyV20
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
-import numpy as np
-import pandas as pd
 
 #%
 class Translator(object):
@@ -13,16 +11,18 @@ class Translator(object):
 
     """
 
-    def __init__(self, broker, accountID, token):
-        self.broker = broker
-        self.accountID = accountID
-        self.token = token
-        if broker == 'oanda':
-            self.client = oandapyV20.API(access_token=token)
+    def __init__(self):
+        # self.broker = broker
+        # self.accountID = accountID
+        # self.token = token
+        # if broker == 'oanda':
+        #     self.client = oandapyV20.API(access_token=token)
+        pass
 
-    def open(self, type, pair, price, vol, slip):
+    def open(self, broker, accountID, token, type, pair, price, vol, slip):
         # Fill or Kill (?)
-        if self.broker == "oanda":
+        if broker == "oanda":
+            client = oandapyV20.API(access_token=token)
             if type == 'l':
                 priceB = (1 + slip) * price
             if type == 's':
@@ -38,25 +38,26 @@ class Translator(object):
                         "priceBound": str(priceB)
                     }
                 }
-            r = orders.OrderCreate(self.accountID, data = data)
-            self.client.request(r)
-            reply = dict(r.response)
-            if "orderFillTransaction" in reply.keys():
-                OFT = reply["orderFillTransaction"]
-                print(OFT)
-                posID = OFT["tradeOpened"]["tradeID"]
-                iprice = float(OFT["price"])
-                ivol = float(OFT["units"])
-                t = pd.Timestamp(OFT["time"], tzinfo = 'UTC')
-                pos = Position(self.broker, posID, pair, iprice, ivol, type, t)
-                pos.status = 'o'
-                return(pos)
-            else:
-                return(None)
+            r = orders.OrderCreate(accountID, data = data)
+            client.request(r)
+            # reply = dict(r.response)
+            # if "orderFillTransaction" in reply.keys():
+            #     OFT = reply["orderFillTransaction"]
+            #     print(OFT)
+            #     posID = OFT["tradeOpened"]["tradeID"]
+            #     iprice = float(OFT["price"])
+            #     ivol = float(OFT["units"])
+            #     t = pd.Timestamp(OFT["time"], tzinfo = 'UTC')
+            #     pos = Position(broker, posID, pair, iprice, ivol, type, t)
+            #     pos.status = 'o'
+            #     return(pos)
+            # else:
+            #     return(None)
 
-    def close(self, pos, vol):
+    def close(self, broker, accountID, token, pos, vol): # also price
         if vol <= pos.log.iloc[-1,].at['vol']:
             if pos.broker == "oanda":
+                client = oandapyV20.API(access_token=token)
                 # if pos.status == 'w':
                 #     r = orders.OrderCancel(accountID = self.accountID, orderID = posID)
                 #     client.request(r)
@@ -69,8 +70,8 @@ class Translator(object):
                 {
                     "units": str(vol)
                 }
-                r = trades.TradeClose(accountID = self.accountID, tradeID = pos.posID, data = data)
-                self.client.request(r)
+                r = trades.TradeClose(accountID = accountID, tradeID = pos.posID, data = data)
+                client.request(r)
                 reply = dict(r.response)
                 OFT = reply["orderFillTransaction"]
                 print(OFT)
@@ -87,9 +88,12 @@ class Position(object):
     """
 
     """
+
+    transl = Translator()
     
-    def __init__(self, broker, posID, pair, initPrice, initVol, typePos, t, stopLoss = 0, takeProfit = 100000): # Dictionary for pairs missing
+    def __init__(self, broker, account, posID, pair, initPrice, initVol, typePos, t, stopLoss = 0, takeProfit = 100000): # Dictionary for pairs missing
         self.broker = broker
+        self.account = account
         self.posID = posID
         self.status = 'w' #w: waiting, o: open, c:close
         self.pair = pair
@@ -104,8 +108,8 @@ class Position(object):
         # self.t = t #last ticket
         # self.entry = entryPos #price to enter position
         # self.exit = exitPos #price to exit position
-        self.stopLoss=stopLoss #hard coded stop loss broker side
-        self.takeProfit=takeProfit #hard coded take profit broker side
+        self.stopLoss = stopLoss #hard coded stop loss broker side
+        self.takeProfit = takeProfit #hard coded take profit broker side
         # self.log = pd.Series([np.NaN, np.NaN],index = ['entry', 'exit'])
 
 
@@ -127,8 +131,8 @@ class Position(object):
     #     self.typePos=typePos
     #     self.profit = price - self.initPrice
         
-    def closePos(self, vol):
-        trans.close(self, vol)
+    def closePos(self, token, vol):
+        self.transl.close(self.broker, self.account, token, self, vol)
         # if self.status == 'o':
         #     if vol <= self.tradeVol:
         #         self.orderlog.loc[t] = {'vol': vol, 'price': price, 'clo': }

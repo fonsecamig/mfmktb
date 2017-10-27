@@ -80,14 +80,19 @@ if chc == 'crc_do':
        print("RESP:\n{} ".format(json.dumps(rv, indent=2)))
 
 if chc == 'streamprice':
+    params =\
+        {
+            "instruments": "EUR_USD,EUR_JPY"
+        }
     r = pricing.PricingStream(accountID=accountID, params=params)
     rv = api.request(r)
-    maxrecs = 100
+    maxrecs = 10
     for ticks in rv:
         maxrecs -= 1
         print(json.dumps(ticks, indent=4), ",")
         if maxrecs == 0:
-            r.terminate("maxrecs records received")
+            # r.terminate("maxrecs records received")
+            break
 
 if chc == 'streamtrans':
     params = {"instruments": "EUR_USD,EUR_JPY"}

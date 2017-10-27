@@ -1,14 +1,15 @@
 import numpy as np
 import pandas as pd
 import datetime as dt
-
-import trade as td
-
 import json
 import oandapyV20
 from oandapyV20 import API
+import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as trans
+import trade as td
+
+transl0 = td.Translator()
 
 def auth():
     accountID, token = None, None
@@ -28,6 +29,7 @@ r = trades.OpenTrades(accountID = accountID)
 client.request(r)
 reply = dict(r.response)
 tList = reply["trades"]
+tList.reverse()
 
 posList = []
 for T in tList:
@@ -43,7 +45,7 @@ for T in tList:
         typePos = 'l'
     else:
         typePos = 's'
-    posList.append(td.Position('oanda', oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
+    posList.append(td.Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
     posList[-1].status = 'o'
     if "closingTransactionIDs" in oT.keys():
         for cT in oT["closingTransactionIDs"]:
@@ -59,9 +61,6 @@ for T in tList:
                 t = pd.Timestamp(oC["time"])
                 posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
 
-# tempL = [o for o in posList if o.posID == T["id"]]
-# if tempL == []:
-
 # parstreamtrans =\
 #     {
 #         "instruments": "EUR_USD,EUR_JPY"
@@ -74,7 +73,31 @@ try:
         print(T)
         oT = dict(T)
         if "orderFillTransaction" in oT.keys():
-            oF = dict(oT["orderFillTransaction"])
-
+            oF = oT["orderFillTransaction"]
+            if "tradeOpened" in oF.keys():
+                oC = oF["tradeOpened"]
+                tempL = [o for o in posList if o.posID == oC["id"]]
+                if tempL == []:
+                    if not oT["instrument"] in pairList:
+                        pairList.append(oC["instrument"])
+                        pairList.sort()
+                    print(oC)
+                    if float(oC["initialUnits"]) >= 0:
+                        typePos = 'l'
+                    else:
+                        typePos = 's'
+                    posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]),
+                                               abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
+                    posList[-1].status = 'o'
+            if "tradesClosed" in oF.keys():
+                oCl = oF["tradesClosed"]
+                oCl.reverse()
+                for ocp in oCL:
+                    i = [j for j in range(posList) if posList[j].posID == ocp["id"]][0]
+                    v = posList[i].log.iloc[-1,].vol - float(ocp["units"])
+                    p = oF["price"]
+                    cp =
+                    t = pd.Timestamp(oF["time"])
+                    posList[i].log.loc[t] =
 finally:
     pass

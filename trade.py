@@ -4,6 +4,7 @@ import datetime as dt
 import oandapyV20
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
+import config as cfg
 
 #%
 class Translator(object):
@@ -72,15 +73,15 @@ class Translator(object):
                 }
                 r = trades.TradeClose(accountID = accountID, tradeID = pos.posID, data = data)
                 client.request(r)
-                reply = dict(r.response)
-                OFT = reply["orderFillTransaction"]
-                print(OFT)
-                v = pos.log.iloc[-1,].at['vol'] + float(OFT["units"])
-                p = float(OFT["price"])
-                cp = pos.log.iloc[-1,].at['closedprof'] + float(OFT["pl"])
-                t = pd.Timestamp(pd.Timestamp(OFT["time"]))
-                pos.log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-                pos.status = 'c'
+                # reply = dict(r.response)
+                # OFT = reply["orderFillTransaction"]
+                # print(OFT)
+                # v = pos.log.iloc[-1,].at['vol'] + float(OFT["units"])
+                # p = float(OFT["price"])
+                # cp = pos.log.iloc[-1,].at['closedprof'] + float(OFT["pl"])
+                # t = pd.Timestamp(pd.Timestamp(OFT["time"]))
+                # pos.log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                # pos.status = 'c'
                 return(r.response)
 
 #%%
@@ -131,8 +132,8 @@ class Position(object):
     #     self.typePos=typePos
     #     self.profit = price - self.initPrice
         
-    def closePos(self, token, vol):
-        self.transl.close(self.broker, self.account, token, self, vol)
+    def closePos(self, vol):
+        self.transl.close(self.broker, self.account, cfg.brokerList[self.broker]["token"], self, vol)
         # if self.status == 'o':
         #     if vol <= self.tradeVol:
         #         self.orderlog.loc[t] = {'vol': vol, 'price': price, 'clo': }

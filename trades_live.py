@@ -4,6 +4,7 @@ from oandapyV20 import API
 from oandapyV20.contrib.requests import TradeCloseRequest
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as trans
+import oandapyV20.endpoints.pricing as pricing
 
 import sys
 

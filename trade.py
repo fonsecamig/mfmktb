@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 import oandapyV20
+from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
-import config as cfg
+import oandapyV20.endpoints.transactions as trans
+import oandapyV20.endpoints.pricing as pricing
 
 #%
 class Translator(object):
@@ -82,15 +84,94 @@ class Translator(object):
                 # t = pd.Timestamp(pd.Timestamp(OFT["time"]))
                 # pos.log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
                 # pos.status = 'c'
-                return(r.response)
+                # return(r.response)
 
+    def initPosLog(self, broker, accountID, token, pairList = [], posList = []):
+        if broker == "oanda":
+            client = oandapyV20.API(access_token = token)
+            r = trades.OpenTrades(accountID = accountID)
+            client.request(r)
+            reply = dict(r.response)
+            tList = reply["trades"]
+            tList.reverse()
+            for T in tList:
+                ro = trades.TradeDetails(accountID = accountID, tradeID=T["id"])
+                client.request(ro)
+                reply = dict(ro.response)
+                oT = reply["trade"]
+                if not oT["instrument"] in cfg.pairList:
+                    pairList.append(oT["instrument"])
+                    pairList.sort()
+                print(oT)
+                if float(oT["initialUnits"]) >= 0:
+                    typePos = 'l'
+                else:
+                    typePos = 's'
+                posList.append(td.Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
+                posList[-1].status = 'o'
+                if "closingTransactionIDs" in oT.keys():
+                    for cT in oT["closingTransactionIDs"]:
+                        rc = trans.TransactionDetails(accountID = accountID, transactionID = cT)
+                        client.request(rc)
+                        replyt = dict(rc.response)
+                        if "tradeReduced" in replyt["transaction"].keys():
+                            oRe = replyt["transaction"]["tradeReduced"]
+                            v = posList[-1].log.iloc[-1,].vol - abs(float(oRe["units"]))
+                            p = replyt["transaction"]["price"]
+                            cp = float(oRe["realizedPL"])
+                            t = pd.Timestamp(replyt["transaction"]["time"])
+                            posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+        return(pairList, posList)
+
+    def updatePosLog(self, pairList, posList, broker, accountID):
+        oT = dict(cfg.brokerList["oanda"]["account"]["tsv"].__next__())
+        print(json.dumps(oT, indent=4))
+        if oT["type"] == "ORDER_FILL":
+            if "tradeOpened" in oT.keys():
+                oC = oT["tradeOpened"]
+                tempL = [o for o in posList if o.posID == oC["id"]]
+                if tempL == []:
+                    if not oT["instrument"] in cfg.pairList:
+                        pairList.append(oC["instrument"])
+                        pairList.sort()
+                    print(oC)
+                    if float(oC["initialUnits"]) >= 0:
+                        typePos = 'l'
+                    else:
+                        typePos = 's'
+                    posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]), abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
+                    posList[-1].status = 'o'
+            if "tradesClosed" in oT.keys():
+                oCl = oT["tradesClosed"]
+                oCl.reverse()
+                for ocp in oCl:
+                    iL = [j for j in range(posList.__len__()) if posList[j].posID == ocp["tradeID"]]
+                    i = int(iL[0])
+                    v = posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
+                    p = oT["price"]
+                    cp = float(ocp["realizedPL"])
+                    t = pd.Timestamp(oT["time"])
+                    posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                    if posList[i].log.loc[t].vol == 0:
+                        posList[i].status = 'c'
+            if "tradeReduced" in oT.keys():
+                oRe = oT["tradeReduced"]
+                iL = [j for j in range(posList.__len__()) if posList[j].posID == oRe["tradeID"]]
+                i = int(iL[0])
+                v = posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
+                p = oT["price"]
+                cp = float(oT["tradeReduced"]["realizedPL"])
+                t = pd.Timestamp(oT["time"])
+                posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                if posList[i].log.loc[t].vol == 0:
+                    posList[i].status = 'c'
 #%%
 class Position(object):
     """
 
     """
 
-    transl = Translator()
+    # transl = Translator()
     
     def __init__(self, broker, account, posID, pair, initPrice, initVol, typePos, t, stopLoss = 0, takeProfit = 100000): # Dictionary for pairs missing
         self.broker = broker
@@ -125,19 +206,9 @@ class Position(object):
 #            self.log.append([t, price])
         self.profit = self.profitcalc(price)
         return([t, price, self.profit])
+
         
-    # def openPos(self, t, price, typePos):
-    #     self.initPrice = price
-    #     self.log.append([t, price])
-    #     self.typePos=typePos
-    #     self.profit = price - self.initPrice
-        
-    def closePos(self, vol):
-        self.transl.close(self.broker, self.account, cfg.brokerList[self.broker]["token"], self, vol)
-        # if self.status == 'o':
-        #     if vol <= self.tradeVol:
-        #         self.orderlog.loc[t] = {'vol': vol, 'price': price, 'clo': }
-        #         self.profit = price - self.initPrice
-        #     self.status = 'c'
+    # def closePos(self, vol):
+    #     self.transl.close(self.broker, self.account, cfg.brokerList[self.broker]["token"], self, vol)
 
 #% Temp

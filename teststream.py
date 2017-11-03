@@ -37,14 +37,15 @@ pstream = pricing.PricingStream(accountID = accountID, params = parstreamtrans)
 cfg.brokerList['oanda']['psv'] = client.request(pstream)
 
 rec = 0
-pstream = pricing.PricingStream(accountID=cfg.brokerList['oanda']['account'], params=parstreamtrans)
+pstream = pricing.PricingStream(accountID=cfg.brokerList['oanda']['accounts'][0], params=parstreamtrans)
 psv = client.request(pstream)
-tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['account'])
+tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][0])
 tsv = client.request(tstream)
 
 while True:
     oP = dict(psv.__next__())
     print(json.dumps(oP, indent=4))
+    cfg.transl.updatePosLog('oanda', cfg.brokerList['oanda']['tsv'], cfg.brokerList['oanda']['accounts'][0], cfg.pairList, cfg.posList)
     rec += 1
     # if rec == 3:
     #     posList[-1].closePos(10)

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import datetime as dt
+import json
 import oandapyV20
 from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
@@ -86,7 +87,7 @@ class Translator(object):
                 # pos.status = 'c'
                 # return(r.response)
 
-    def initPosLog(self, broker, accountID, token, pairList = [], posList = []):
+    def initPosLog(self, broker, token, accountID, pairList = [], posList = []):
         if broker == "oanda":
             client = oandapyV20.API(access_token = token)
             r = trades.OpenTrades(accountID = accountID)
@@ -99,7 +100,7 @@ class Translator(object):
                 client.request(ro)
                 reply = dict(ro.response)
                 oT = reply["trade"]
-                if not oT["instrument"] in cfg.pairList:
+                if not oT["instrument"] in pairList:
                     pairList.append(oT["instrument"])
                     pairList.sort()
                 print(oT)
@@ -107,7 +108,7 @@ class Translator(object):
                     typePos = 'l'
                 else:
                     typePos = 's'
-                posList.append(td.Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
+                posList.append(Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
                 posList[-1].status = 'o'
                 if "closingTransactionIDs" in oT.keys():
                     for cT in oT["closingTransactionIDs"]:
@@ -123,8 +124,8 @@ class Translator(object):
                             posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
         return(pairList, posList)
 
-    def updatePosLog(self, pairList, posList, broker, accountID):
-        oT = dict(cfg.brokerList["oanda"]["account"]["tsv"].__next__())
+    def updatePosLog(self, broker, tsv, accountID, pairList, posList): # Only works for Oanda
+        oT = dict(tsv.__next__())
         print(json.dumps(oT, indent=4))
         if oT["type"] == "ORDER_FILL":
             if "tradeOpened" in oT.keys():

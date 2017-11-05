@@ -124,48 +124,62 @@ class Translator(object):
                             posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
         return(pairList, posList)
 
-    def updatePosLog(self, broker, tsv, accountID, pairList, posList): # Only works for Oanda
-        oT = dict(tsv.__next__())
-        print(json.dumps(oT, indent=4))
-        if oT["type"] == "ORDER_FILL":
-            if "tradeOpened" in oT.keys():
-                oC = oT["tradeOpened"]
-                tempL = [o for o in posList if o.posID == oC["id"]]
-                if tempL == []:
-                    if not oT["instrument"] in cfg.pairList:
-                        pairList.append(oC["instrument"])
-                        pairList.sort()
-                    print(oC)
-                    if float(oC["initialUnits"]) >= 0:
-                        typePos = 'l'
-                    else:
-                        typePos = 's'
-                    posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]), abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
-                    posList[-1].status = 'o'
-            if "tradesClosed" in oT.keys():
-                oCl = oT["tradesClosed"]
-                oCl.reverse()
-                for ocp in oCl:
-                    iL = [j for j in range(posList.__len__()) if posList[j].posID == ocp["tradeID"]]
+    def updatePosLog(self, broker, tsv, accountID, pairList, posList):
+        if broker == 'oanda':
+            oT = dict(tsv.__next__())
+            print(json.dumps(oT, indent=4))
+            if oT["type"] == "ORDER_FILL":
+                if "tradeOpened" in oT.keys():
+                    oC = oT["tradeOpened"]
+                    tempL = [o for o in posList if o.posID == oC["id"]]
+                    if tempL == []:
+                        if not oT["instrument"] in cfg.pairList:
+                            pairList.append(oC["instrument"])
+                            pairList.sort()
+                        print(oC)
+                        if float(oC["initialUnits"]) >= 0:
+                            typePos = 'l'
+                        else:
+                            typePos = 's'
+                        posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]), abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
+                        posList[-1].status = 'o'
+                if "tradesClosed" in oT.keys():
+                    oCl = oT["tradesClosed"]
+                    oCl.reverse()
+                    for ocp in oCl:
+                        iL = [j for j in range(posList.__len__()) if posList[j].account == accountID and posList[j].posID == ocp["tradeID"]]
+                        i = int(iL[0])
+                        v = posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
+                        p = oT["price"]
+                        cp = float(ocp["realizedPL"])
+                        t = pd.Timestamp(oT["time"])
+                        posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                        if posList[i].log.loc[t].vol == 0:
+                            posList[i].status = 'c'
+                if "tradeReduced" in oT.keys():
+                    oRe = oT["tradeReduced"]
+                    iL = [j for j in range(posList.__len__()) if posList[j].account == accountID and posList[j].posID == oRe["tradeID"]]
                     i = int(iL[0])
-                    v = posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
+                    v = posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
                     p = oT["price"]
-                    cp = float(ocp["realizedPL"])
+                    cp = float(oT["tradeReduced"]["realizedPL"])
                     t = pd.Timestamp(oT["time"])
                     posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
                     if posList[i].log.loc[t].vol == 0:
                         posList[i].status = 'c'
-            if "tradeReduced" in oT.keys():
-                oRe = oT["tradeReduced"]
-                iL = [j for j in range(posList.__len__()) if posList[j].posID == oRe["tradeID"]]
-                i = int(iL[0])
-                v = posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
-                p = oT["price"]
-                cp = float(oT["tradeReduced"]["realizedPL"])
-                t = pd.Timestamp(oT["time"])
-                posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-                if posList[i].log.loc[t].vol == 0:
-                    posList[i].status = 'c'
+
+    def tick(self, broker, tsv, accountID, pairList, pListOld):
+        if broker == 'oanda':
+            if pairList != pListOld:
+                parstreamtrans = \
+                    {
+                        "instruments": ",".join(pairList)
+                    }
+                pstream = pricing.PricingStream(accountID=accountID, params=parstreamtrans)
+                psv = client.request(pstream)
+            pS = dict(psv.__next__())
+            t = pd.Timestamp(pS["time"])
+            if ""
 #%%
 class Position(object):
     """

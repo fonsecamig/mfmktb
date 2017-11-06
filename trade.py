@@ -4,10 +4,12 @@ import datetime as dt
 import json
 import oandapyV20
 from oandapyV20 import API
+import oandapyV20.endpoints.accounts as accounts
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as trans
 import oandapyV20.endpoints.pricing as pricing
+import config as cfg
 
 #%
 class Translator(object):
@@ -23,10 +25,25 @@ class Translator(object):
         #     self.client = oandapyV20.API(access_token=token)
         pass
 
+    def initAccount(self, broker, token):
+        if broker == 'oanda':
+            client = oandapyV20.API(access_token = token)
+            r = accounts.AccountList()
+            rv = dict(client.request(r))
+            cfg.brokerList['oanda'] = {'token': token}
+            cfg.brokerList['oanda']['accounts'] = []
+            for acc in rv["accounts"]:
+                ra = accounts.AccountDetails(acc["id"])
+                rav = client.request(ra)
+                cfg.brokerList['oanda']['accounts'].append(
+                    {'ID': acc["id"], 'tsv': None, 'psv': None, 'bal': rav["account"]["balance"],
+                     'margin': rav["account"]["marginRate"], 'mUsed': rav["account"]["marginUsed"],
+                     'curr': rav["account"]["currency"]})
+
     def open(self, broker, accountID, token, type, pair, price, vol, slip):
         # Fill or Kill (?)
         if broker == "oanda":
-            client = oandapyV20.API(access_token=token)
+            client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
             if type == 'l':
                 priceB = (1 + slip) * price
             if type == 's':
@@ -42,77 +59,46 @@ class Translator(object):
                         "priceBound": str(priceB)
                     }
                 }
-            r = orders.OrderCreate(accountID, data = data)
+            r = orders.OrderCreate(cfg.brokerList['oanda']['accounts'][accountID]['ID'], data = data)
             client.request(r)
-            # reply = dict(r.response)
-            # if "orderFillTransaction" in reply.keys():
-            #     OFT = reply["orderFillTransaction"]
-            #     print(OFT)
-            #     posID = OFT["tradeOpened"]["tradeID"]
-            #     iprice = float(OFT["price"])
-            #     ivol = float(OFT["units"])
-            #     t = pd.Timestamp(OFT["time"], tzinfo = 'UTC')
-            #     pos = Position(broker, posID, pair, iprice, ivol, type, t)
-            #     pos.status = 'o'
-            #     return(pos)
-            # else:
-            #     return(None)
 
     def close(self, broker, accountID, token, pos, vol): # also price
         if vol <= pos.log.iloc[-1,].at['vol']:
             if pos.broker == "oanda":
-                client = oandapyV20.API(access_token=token)
-                # if pos.status == 'w':
-                #     r = orders.OrderCancel(accountID = self.accountID, orderID = posID)
-                #     client.request(r)
-                #     reply = dict(r.response)
-                #     v = pos.orderLog.iloc[-1, 'volLeft']
-                #     p = pos.orderLog.iloc[-1, 'price']
-                #     t = pd.to_datetime(reply["orderCancelTransaction"]["time"])
-                #     pos.orderLog.loc[t] = pd.DataFrame({'volLeft': v, 'price': p})
+                client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                 data = \
                 {
                     "units": str(vol)
                 }
-                r = trades.TradeClose(accountID = accountID, tradeID = pos.posID, data = data)
+                r = trades.TradeClose(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], tradeID = pos.posID, data = data)
                 client.request(r)
-                # reply = dict(r.response)
-                # OFT = reply["orderFillTransaction"]
-                # print(OFT)
-                # v = pos.log.iloc[-1,].at['vol'] + float(OFT["units"])
-                # p = float(OFT["price"])
-                # cp = pos.log.iloc[-1,].at['closedprof'] + float(OFT["pl"])
-                # t = pd.Timestamp(pd.Timestamp(OFT["time"]))
-                # pos.log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-                # pos.status = 'c'
                 # return(r.response)
 
-    def initPosLog(self, broker, token, accountID, pairList = [], posList = []):
+    def initPosLog(self, broker, token, accountID):
         if broker == "oanda":
-            client = oandapyV20.API(access_token = token)
-            r = trades.OpenTrades(accountID = accountID)
+            client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
+            r = trades.OpenTrades(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
             client.request(r)
             reply = dict(r.response)
             tList = reply["trades"]
             tList.reverse()
             for T in tList:
-                ro = trades.TradeDetails(accountID = accountID, tradeID=T["id"])
+                ro = trades.TradeDetails(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], tradeID=T["id"])
                 client.request(ro)
                 reply = dict(ro.response)
                 oT = reply["trade"]
-                if not oT["instrument"] in pairList:
-                    pairList.append(oT["instrument"])
-                    pairList.sort()
-                print(oT)
+                if not oT["instrument"] in cfg.pairList:
+                    cfg.pairList.append(oT["instrument"])
+                    cfg.pairList.sort()
                 if float(oT["initialUnits"]) >= 0:
                     typePos = 'l'
                 else:
                     typePos = 's'
-                posList.append(Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
-                posList[-1].status = 'o'
+                cfg.posList.append(Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
+                cfg.posList[-1].status = 'o'
                 if "closingTransactionIDs" in oT.keys():
                     for cT in oT["closingTransactionIDs"]:
-                        rc = trans.TransactionDetails(accountID = accountID, transactionID = cT)
+                        rc = trans.TransactionDetails(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], transactionID = cT)
                         client.request(rc)
                         replyt = dict(rc.response)
                         if "tradeReduced" in replyt["transaction"].keys():
@@ -122,64 +108,91 @@ class Translator(object):
                             cp = float(oRe["realizedPL"])
                             t = pd.Timestamp(replyt["transaction"]["time"])
                             posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-        return(pairList, posList)
+            tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
+            cfg.brokerList['oanda']['accounts'][accountID]['tsv'] = client.request(tstream)
 
-    def updatePosLog(self, broker, tsv, accountID, pairList, posList):
+    def updatePosLog(self, broker, accountID):
         if broker == 'oanda':
-            oT = dict(tsv.__next__())
-            print(json.dumps(oT, indent=4))
+            oT = dict(cfg.brokerList['oanda']['accounts'][accountID]['tsv'].__next__())
             if oT["type"] == "ORDER_FILL":
                 if "tradeOpened" in oT.keys():
                     oC = oT["tradeOpened"]
-                    tempL = [o for o in posList if o.posID == oC["id"]]
+                    tempL = [o for o in cfg.posList if o.posID == oC["id"]]
                     if tempL == []:
                         if not oT["instrument"] in cfg.pairList:
-                            pairList.append(oC["instrument"])
-                            pairList.sort()
-                        print(oC)
+                            cfg.pairList.append(oC["instrument"])
+                            cfg.pairList.sort()
+                            client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
+                            parstreamtrans = \
+                                {
+                                    "instruments": ",".join(cfg.pairList)
+                                }
+                            pstream = pricing.PricingStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], params = parstreamtrans)
+                            cfg.brokerList[broker]['psv'] = client.request(pstream)
                         if float(oC["initialUnits"]) >= 0:
                             typePos = 'l'
                         else:
                             typePos = 's'
-                        posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]), abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
-                        posList[-1].status = 'o'
+                        cfg.posList.append(td.Position('oanda', accountID, oC["id"], oC["instrument"], float(oC["price"]), abs(float(oC["initialUnits"])), typePos, pd.Timestamp(oC["openTime"])))
+                        cfg.posList[-1].status = 'o'
                 if "tradesClosed" in oT.keys():
                     oCl = oT["tradesClosed"]
                     oCl.reverse()
                     for ocp in oCl:
-                        iL = [j for j in range(posList.__len__()) if posList[j].account == accountID and posList[j].posID == ocp["tradeID"]]
+                        iL = [j for j in range(cfg.posList.__len__()) if cfg.posList[j].account == accountID and cfg.posList[j].posID == ocp["tradeID"]]
                         i = int(iL[0])
-                        v = posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
+                        v = cfg.posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
                         p = oT["price"]
                         cp = float(ocp["realizedPL"])
                         t = pd.Timestamp(oT["time"])
-                        posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-                        if posList[i].log.loc[t].vol == 0:
-                            posList[i].status = 'c'
+                        cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                        if cfg.posList[i].log.loc[t].vol == 0:
+                            cfg.posList[i].status = 'c'
                 if "tradeReduced" in oT.keys():
                     oRe = oT["tradeReduced"]
-                    iL = [j for j in range(posList.__len__()) if posList[j].account == accountID and posList[j].posID == oRe["tradeID"]]
+                    iL = [j for j in range(cfg.posList.__len__()) if cfg.posList[j].account == accountID and cfg.posList[j].posID == oRe["tradeID"]]
                     i = int(iL[0])
-                    v = posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
+                    v = cfg.posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
                     p = oT["price"]
                     cp = float(oT["tradeReduced"]["realizedPL"])
                     t = pd.Timestamp(oT["time"])
-                    posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
-                    if posList[i].log.loc[t].vol == 0:
-                        posList[i].status = 'c'
+                    cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                    if cfg.posList[i].log.loc[t].vol == 0:
+                        cfg.posList[i].status = 'c'
 
-    def tick(self, broker, tsv, accountID, pairList, pListOld):
+    def initTick(self, broker, accountID):
         if broker == 'oanda':
-            if pairList != pListOld:
-                parstreamtrans = \
-                    {
-                        "instruments": ",".join(pairList)
-                    }
-                pstream = pricing.PricingStream(accountID=accountID, params=parstreamtrans)
-                psv = client.request(pstream)
-            pS = dict(psv.__next__())
-            t = pd.Timestamp(pS["time"])
-            if ""
+            cfg.priceList['oanda'] = [pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
+                                                    'bid': [None for i in range(cfg.pairList.__len__())],
+                                                    'ts': [None for i in range(cfg.pairList.__len__())]},
+                                                   index=cfg.pairList)]
+            client = API(access_token = cfg.brokerList['oanda']['token'])
+            parstreamtrans =\
+            {
+                "instruments": ",".join(cfg.pairList)
+            }
+            r = pricing.PricingInfo(accountID=cfg.brokerList['oanda']['accounts'][accountID]['ID'], params = parstreamtrans)
+            rv = dict(client.request(r))
+            for ipair in rv["prices"]:
+                p = ipair["instrument"]
+                a = float(ipair["asks"][0]['price'])
+                b = float(ipair["bids"][0]['price'])
+                t = pd.Timestamp(ipair["time"])
+                cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
+            pstream = pricing.PricingStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], params = parstreamtrans)
+            cfg.brokerList['oanda']['accounts'][accountID]['psv'] = client.request(pstream)
+
+    def tick(self, broker, accountID):
+        res = {}
+        if broker == 'oanda':
+            pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
+            if pS["type"] == "PRICE":
+                p = pS["instrument"]
+                a = float(pS["asks"][0]['price'])
+                b = float(pS["bids"][0]['price'])
+                t = pd.Timestamp(pS["time"])
+                cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
+        return(res)
 #%%
 class Position(object):
     """
@@ -212,9 +225,9 @@ class Position(object):
 
     def profitcalc(self, price):
         if self.typePos == 'l':
-            return(self.log.closedprof[-1] + self.tradeVol * price - self.cost)
+            return(self.log.closedprof[-1] + self.tradeVol * price)
         if self.typePos == 's':
-            return(self.log.closedprof[-1] + self.cost - self.tradeVol * price)
+            return(self.log.closedprof[-1] - self.tradeVol * price)
 
     def tick(self, t, price):
 #        if self.status == 'o':

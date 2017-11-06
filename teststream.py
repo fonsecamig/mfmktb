@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import oandapyV20
 from oandapyV20 import API
+import oandapyV20.endpoints.accounts as accounts
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as trans
@@ -22,32 +23,16 @@ def auth():
 
 accountID, access_token = auth()
 
-cfg.brokerList = {'oanda': {'token': access_token, 'accounts': [accountID]}}
-cfg.pairList = []
-cfg.pairList, cfg.posList = cfg.transl.initPosLog('oanda', cfg.brokerList['oanda']['token'], cfg.brokerList['oanda']['accounts'][0], cfg.pairList, [])
-
-client = API(access_token = cfg.brokerList['oanda']['token'])
-tstream = trans.TransactionsStream(accountID = accountID)
-cfg.brokerList['oanda']['tsv'] = client.request(tstream)
-parstreamtrans =\
-    {
-        "instruments": ",".join(cfg.pairList)
-    }
-pstream = pricing.PricingStream(accountID = accountID, params = parstreamtrans)
-cfg.brokerList['oanda']['psv'] = client.request(pstream)
+transl0.initAccount('oanda', access_token)
 
 rec = 0
-pstream = pricing.PricingStream(accountID=cfg.brokerList['oanda']['accounts'][0], params=parstreamtrans)
-psv = client.request(pstream)
-tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][0])
-tsv = client.request(tstream)
-
+transl0.initPosLog('oanda', cfg.brokerList['oanda']['token'], 0)
+transl0.initTick('oanda', 0)
+print(cfg.priceList['oanda'][0])
 while True:
-    oP = dict(psv.__next__())
-    print(json.dumps(oP, indent=4))
-    cfg.transl.updatePosLog('oanda', cfg.brokerList['oanda']['tsv'], cfg.brokerList['oanda']['accounts'][0], cfg.pairList, cfg.posList)
+    transl0.tick('oanda', 0)
+    transl0.updatePosLog('oanda', 0)
+    print(cfg.priceList['oanda'][0])
     rec += 1
-    # if rec == 3:
-    #     posList[-1].closePos(10)
     if rec >=10 :
         break

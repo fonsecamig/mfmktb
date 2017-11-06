@@ -1,5 +1,6 @@
-import trade as td
+# import trade as td
 
-brokerList = None
-pairList = None
-transl = td.Translator()
+brokerList = {}
+pairList = []
+posList = []
+priceList = {}

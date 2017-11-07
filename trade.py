@@ -35,7 +35,7 @@ class Translator(object):
                      'margin': float(rav["account"]["marginRate"]),
                      'curr': rav["account"]["currency"], 'log': pd.Series([float(rav["account"]["balance"])], index = [pd.Timestamp.now(tz = 'utc')])})
 
-    def open(self, broker, accountID, token, type, pair, price, vol, slip):
+    def open(self, broker, accountID, type, pair, vol, price, slip):
         # Fill or Kill (?)
         if broker == "oanda":
             client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
@@ -57,7 +57,7 @@ class Translator(object):
             r = orders.OrderCreate(cfg.brokerList['oanda']['accounts'][accountID]['ID'], data = data)
             client.request(r)
 
-    def close(self, broker, accountID, token, pos, vol): # also price
+    def close(self, broker, accountID, pos, vol): # also price
         if vol <= pos.log.iloc[-1,].at['vol']:
             if pos.broker == "oanda":
                 client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
@@ -68,7 +68,7 @@ class Translator(object):
                 r = trades.TradeClose(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], tradeID = pos.posID, data = data)
                 client.request(r)
 
-    def initPosLog(self, broker, token, accountID):
+    def initPosLog(self, broker, accountID):
         if broker == "oanda":
             client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
             r = trades.OpenTrades(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
@@ -159,10 +159,10 @@ class Translator(object):
 
     def initTick(self, broker, accountID):
         if broker == 'oanda':
-            cfg.priceList['oanda'] = [pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
+            cfg.priceList['oanda'][accountID] = pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
                                                     'bid': [None for i in range(cfg.pairList.__len__())],
                                                     'ts': [None for i in range(cfg.pairList.__len__())]},
-                                                   index=cfg.pairList)]
+                                                   index=cfg.pairList)
             client = API(access_token = cfg.brokerList['oanda']['token'])
             parstreamtrans =\
             {
@@ -180,7 +180,6 @@ class Translator(object):
             cfg.brokerList['oanda']['accounts'][accountID]['psv'] = client.request(pstream)
 
     def tick(self, broker, accountID):
-        res = {}
         if broker == 'oanda':
             pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
             if pS["type"] == "PRICE":
@@ -189,7 +188,13 @@ class Translator(object):
                 b = float(pS["bids"][0]['price'])
                 t = pd.Timestamp(pS["time"])
                 cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
-        return(res)
+
+    def execute(self, orders):
+        for o in orders:
+            if o['oType'] == 'o':
+                self.open(o['broker'], o['account'], o['type'], o['pair'], o['vol'], o['price'], o['slip'])
+            if o['oType'] == 'c':
+                self.close(o['broker'], o['account'], o['pos'], o['vol'])
 #%%
 class Position(object):
     """

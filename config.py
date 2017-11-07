@@ -1,6 +1,7 @@
-# import trade as td
+import trade as td
 
 brokerList = {}
 pairList = []
 posList = []
 priceList = {}
+transl = td.Translator()

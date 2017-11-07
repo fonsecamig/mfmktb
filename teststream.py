@@ -23,6 +23,8 @@ def auth():
 
 accountID, access_token = auth()
 
+cfg.pairList = ["EUR_USD"]
+
 transl0.initAccount('oanda', access_token)
 
 rec = 0

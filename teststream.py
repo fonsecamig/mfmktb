@@ -10,6 +10,7 @@ import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as trans
 import oandapyV20.endpoints.pricing as pricing
 import trade as td
+import strategies as stratg
 import config as cfg
 
 def auth():
@@ -21,18 +22,21 @@ def auth():
 
 accountID, access_token = auth()
 
-cfg.pairList = ["EUR_USD"]
+transl = td.Translator()
 
-cfg.transl.initAccount('oanda', access_token)
+cfg.pairList = ["EUR_USD", "GBP_USD", "USD_CAD", "GBP_CHF"]
+strategy = stratg.TestStrategy(10, 0.00001, 0.00025, 0.5)
+transl.initAccount('oanda', access_token)
 
 rec = 0
-cfg.transl.initPosLog('oanda', 0)
-cfg.transl.initTick('oanda', 0)
-print(cfg.priceList['oanda'][0])
+transl.initPosLog('oanda', 0)
+transl.initTick('oanda', 0)
 while True:
-    cfg.transl.tick('oanda', 0)
-    cfg.transl.updatePosLog('oanda', 0)
-    print(cfg.priceList['oanda'][0])
+    transl.tick('oanda', 0)
+    print([(p.log, p.status) for p in cfg.posList])
+    print(strategy.advice())
+    transl.execute(strategy.advice())
+    transl.updatePosLog('oanda', 0)
     rec += 1
-    if rec >=10 :
+    if rec >=100 :
         break

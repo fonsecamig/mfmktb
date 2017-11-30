@@ -276,7 +276,7 @@ class Translator(object):
             client = API(access_token = cfg.brokerList['oanda']['token'])
             for r in InstrumentsCandlesFactory(instrument = pair, params = paramshist):
                 rv = dict(client.request(r))["candles"]
-                for candle in rv:                    print(candle)
+                for candle in rv:
                     priceH.loc[pd.Timestamp(candle["time"], tzinfo = 'UTC')] = candle["mid"]
             return(priceH)
 

@@ -87,9 +87,7 @@ class Translator(object):
                                 Position('oanda', accountID, oC["tradeID"], oT["instrument"], float(oT["price"]),
                                          abs(float(oC["units"])), typePos, pd.Timestamp(oT["time"])))
                             cfg.posList[-1].status = 'o'
-                            cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[pd.Timestamp(oT["time"])] = float(
-                                oT["accountBalance"])
-                    print(oT)
+                            cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[pd.Timestamp(oT["time"])] = float(oT["accountBalance"])
         finally:
             pass
 
@@ -117,8 +115,9 @@ class Translator(object):
                                 v = cfg.posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
                                 p = oT["price"]
                                 cp = float(ocp["realizedPL"])
+                                comm = float(oT["commission"])
                                 t = pd.Timestamp(oT["time"])
-                                cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                                cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
                                 if cfg.posList[i].log.loc[t].vol == 0:
                                     cfg.posList[i].status = 'c'
                                 cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
@@ -131,8 +130,9 @@ class Translator(object):
                             v = cfg.posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
                             p = oT["price"]
                             cp = float(oT["tradeReduced"]["realizedPL"])
+                            comm = float(oT["commission"])
                             t = pd.Timestamp(oT["time"])
-                            cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                            cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
                             if cfg.posList[i].log.loc[t].vol == 0:
                                 cfg.posList[i].status = 'c'
                             cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
@@ -175,8 +175,9 @@ class Translator(object):
                             v = cfg.posList[-1].log.iloc[-1,].vol - abs(float(oRe["units"]))
                             p = replyt["transaction"]["price"]
                             cp = float(oRe["realizedPL"])
+                            comm = float(replyt["transaction"]["commission"])
                             t = pd.Timestamp(replyt["transaction"]["time"])
-                            cfg.posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                            cfg.posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
             tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
             cfg.brokerList['oanda']['accounts'][accountID]['tsv'] = client.request(tstream)
 
@@ -214,8 +215,9 @@ class Translator(object):
                         v = cfg.posList[i].log.iloc[-1,].vol - abs(float(ocp["units"]))
                         p = oT["price"]
                         cp = float(ocp["realizedPL"])
+                        comm = float(oT["commission"]) / oCl.__len__()
                         t = pd.Timestamp(oT["time"])
-                        cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                        cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
                         if cfg.posList[i].log.loc[t].vol == 0:
                             cfg.posList[i].status = 'c'
                         cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
@@ -226,8 +228,9 @@ class Translator(object):
                     v = cfg.posList[i].log.iloc[-1,].vol - abs(float(oRe["units"]))
                     p = oT["price"]
                     cp = float(oT["tradeReduced"]["realizedPL"])
+                    comm = float(oT["commission"])
                     t = pd.Timestamp(oT["time"])
-                    cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp}
+                    cfg.posList[i].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
                     if cfg.posList[i].log.loc[t].vol == 0:
                         cfg.posList[i].status = 'c'
                     cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
@@ -303,7 +306,7 @@ class Position(object):
         self.pair = pair
         self.initPrice = initPrice #open price
         self.initVol = initVol #initial position volume
-        self.log = pd.DataFrame({'vol': [initVol], 'price': [initPrice], 'closedprof': [float(0)]}, index = [t])
+        self.log = pd.DataFrame({'vol': [initVol], 'price': [initPrice], 'closedprof': [float(0)], 'commission': [0]}, index = [t])
         self.orderLog = pd.DataFrame({'volLeft': [initVol], 'price': [initPrice]}, index = [t])
         self.tradeVol = 0
         self.typePos = typePos #l: long, s: short
@@ -318,11 +321,18 @@ class Position(object):
 
 
     def tick(self):
+        return(self.pl(cfg.priceList[self.broker][self.account].ask[self.pair]))
+        # if self.typePos == 'l':
+        #     return(self.log.closedprof[-1] + self.tradeVol * cfg.priceList[self.broker][self.account].ask[self.pair])
+        # if self.typePos == 's':
+        #     return(self.log.closedprof[-1] - self.tradeVol * cfg.priceList[self.broker][self.account].bid[self.pair])
+
+    def pl(self, p):
         if self.typePos == 'l':
-            return(self.log.closedprof[-1] + self.tradeVol * cfg.priceList[self.broker][self.account].ask[self.pair])
+            return(self.log.closedprof[-1] + self.tradeVol * p)
         if self.typePos == 's':
-            return(self.log.closedprof[-1] - self.tradeVol * cfg.priceList[self.broker][self.account].bid[self.pair])
-        
+            return(self.log.closedprof[-1] - self.tradeVol * p)
+
     # def closePos(self, vol):
     #     self.transl.close(self.broker, self.account, cfg.brokerList[self.broker]["token"], self, vol)
 

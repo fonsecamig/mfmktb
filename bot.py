@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import trade as td
 import strategies as stratg
+import json
 import config as cfg
 
 def auth():
@@ -15,7 +17,7 @@ accountID, access_token = auth()
 transl = td.Translator()
 
 cfg.pairList = ["EUR_USD", "GBP_USD", "USD_CAD", "GBP_CHF"]
-strategy = stratg.TestStrategy(10, 0.001, 0.00025, 0.5)
+strategy = stratg.TestStrategy(10, 0.01, 0.00025, 0.5)
 dur = pd.Timedelta(days = 7)
 
 transl.initAccount('oanda', access_token)
@@ -34,3 +36,9 @@ while pd.Timestamp.now(tz = 'utc') <= timeStop:
             print(strategy.advice())
             transl.execute(strategy.advice())
             transl.updatePosLog(broker, acc)
+
+with open('positions.txt', 'w') as outfile:
+    json.dump(cfg.posList, outfile)
+
+with open('brokers.txt', 'w') as outfile:
+    json.dump(cfg.brokerList, outfile)

@@ -37,8 +37,20 @@ while pd.Timestamp.now(tz = 'utc') <= timeStop:
             transl.execute(strategy.advice())
             transl.updatePosLog(broker, acc)
 
-with open('positions.txt', 'w') as outfile:
-    json.dump(cfg.posList, outfile)
+posLogL = pd.DataFrame([p.log for p in cfg.posList])
+posLog = pd.concat(posLogL, keys = list(range(1, posLogL.__len__() + 1)))
+with ExcelWriter('positions.xlsx') as outfile:
+    posLog.to_excel(outfile)
 
-with open('brokers.txt', 'w') as outfile:
-    json.dump(cfg.brokerList, outfile)
+brokerL = []
+bIndex = []
+ind = 0
+for broker in cfg.brokerList:
+    for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
+        brokerL.append(cfg.brokerList[broker][acc].log)
+        bIndex.append((ind + 1, acc + 1))
+    ind += 1
+index = pd.MultiIndex.from_tuples(bIndex, names=['broker', 'account'])
+brokerLog = pd.concat(brokerL, keys = index)
+with ExcelWriter('accounts.xlsx') as outfile:
+    brokerLog.to_excel(outfile)

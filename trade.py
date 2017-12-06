@@ -44,9 +44,9 @@ class Translator(object):
             if broker == "oanda":
                 client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                 if type == 'l':
-                    priceB = (1 - slip) * price
-                if type == 's':
                     priceB = (1 + slip) * price
+                if type == 's':
+                    priceB = (1 - slip) * price
                 data = \
                     {
                         "order": {
@@ -55,7 +55,7 @@ class Translator(object):
                             "timeInForce": "FOK",
                             "type": "MARKET",
                             "positionFill": "OPEN_ONLY",
-                            "priceBound": str(round(priceB, 4))
+                            "priceBound": str(round(priceB, 5))
                         }
                     }
                 r = orders.OrderCreate(cfg.brokerList['oanda']['accounts'][accountID]['ID'], data = data)

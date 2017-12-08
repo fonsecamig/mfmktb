@@ -31,11 +31,15 @@ timeStop = pd.Timestamp.now(tz = 'utc') + dur
 while pd.Timestamp.now(tz = 'utc') <= timeStop:
     for broker in cfg.brokerList:
         for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
-            transl.tick(broker, acc)
-            print([(p.log, p.status) for p in cfg.posList])
-            print(strategy.advice())
-            transl.execute(strategy.advice())
-            transl.updatePosLog(broker, acc)
+            try:
+                transl.tick(broker, acc)
+                print([(p.log, p.status) for p in cfg.posList])
+                print(strategy.advice())
+                transl.execute(strategy.advice())
+                transl.updatePosLog(broker, acc)
+            except ConnectionResetError:
+                transl.initPosLog(broker, acc)
+                transl.initTick(broker, acc)
 
 posLogL = pd.DataFrame([p.log for p in cfg.posList])
 posLog = pd.concat(posLogL, keys = list(range(1, posLogL.__len__() + 1)))

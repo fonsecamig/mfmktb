@@ -44,13 +44,15 @@ class Translator(object):
             if broker == "oanda":
                 client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                 if type == 'l':
+                    sign = 1
                     priceB = (1 + slip) * price
                 if type == 's':
+                    sign = -1
                     priceB = (1 - slip) * price
                 data = \
                     {
                         "order": {
-                            "units": str(vol),
+                            "units": str(sign * vol),
                             "instrument": pair,
                             "timeInForce": "FOK",
                             "type": "MARKET",

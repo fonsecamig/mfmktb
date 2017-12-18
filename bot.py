@@ -1,4 +1,4 @@
-import numpy as np # Not necessary
+import numpy as np
 import pandas as pd
 import trade as td
 import strategies as stratg

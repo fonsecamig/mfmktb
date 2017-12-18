@@ -269,22 +269,31 @@ class Translator(object):
                 t = pd.Timestamp(pS["time"])
                 cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
 
-    def histPrice(self, broker, accountID, pair, t, gran = 'M10'):
+    def histPrice(self, broker, accountID, pair, t0, t1 = None, gran = 'M10'):
         if broker == 'oanda':
-            tStr = t.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
-            paramshist = \
-                {
-                    "from": str(tStr),
-                    "granularity": gran
-                }
+            t0Str = t0.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+            if t1 == None:
+                paramshist = \
+                    {
+                        "from": str(t0Str),
+                        "granularity": gran
+                    }
+            else:
+                t1Str = t1.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+                paramshist = \
+                    {
+                        "from": str(t0Str),
+                        "to": str(t1Str),
+                        "granularity": gran
+                    }
             priceH = pd.DataFrame({'c': [], 'h': [], 'l': [], 'o': []}, index = [])
             client = API(access_token = cfg.brokerList['oanda']['token'])
             for r in InstrumentsCandlesFactory(instrument = pair, params = paramshist):
                 rv = dict(client.request(r))["candles"]
                 for candle in rv:
+                    print(candle)
                     priceH.loc[pd.Timestamp(candle["time"], tzinfo = 'UTC')] = candle["mid"]
             return(priceH)
-
 
     def execute(self, orders):
         for o in orders:
@@ -292,6 +301,8 @@ class Translator(object):
                 self.open(o['broker'], o['account'], o['type'], o['pair'], o['vol'], o['price'], o['slip'])
             if o['oType'] == 'c':
                 self.close(o['broker'], o['account'], o['pos'], o['vol'])
+
+
 #%%
 class Position(object):
     """

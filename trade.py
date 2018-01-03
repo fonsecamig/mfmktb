@@ -49,6 +49,11 @@ class Translator(object):
 
     def open(self, broker, accountID, typeP, pair, vol, price, slip):
         try:
+            if broker == "backtest":
+                cfg.posList.append(
+                    Position('backtest', accountID, 0, pair, price, vol, typeP, cfg.priceList['backtest'][0].loc[pair].ts))
+                cfg.posList[-1].status = 'o'
+                cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[pd.Timestamp(oT["time"])] = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] - price * vol
             if broker == "oanda":
                 client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                 if typeP == 'l':
@@ -70,7 +75,6 @@ class Translator(object):
                     }
                 r = orders.OrderCreate(cfg.brokerList['oanda']['accounts'][accountID]['ID'], data = data)
                 ro = dict(client.request(r))
-                print(json.dumps(ro, indent = 4))
                 if "orderFillTransaction" in ro.keys():
                     oT = ro["orderFillTransaction"]
                     if "tradeOpened" in oT.keys():
@@ -104,6 +108,20 @@ class Translator(object):
     def close(self, broker, accountID, pos, vol):
         try:
             if vol <= cfg.posList[pos].log.iloc[-1,].at['vol']:
+                if cfg.posList[pos].broker == "backtest":
+                    if cfg.posList[pos].typePos == 'l':
+                        tTrans = 'bid'
+                    if cfg.posList[pos].typePos == 's':
+                        tTrans = 'ask'
+                    v = cfg.posList[pos].log.iloc[-1,].vol - vol
+                    p = cfg.priceList['backtest'][0].loc[cfg.posList[pos].pair][tTrans]
+                    cp = cfg.posList[pos].log.loc[-1].closedprof + v * p
+                    comm = 0
+                    t = cfg.priceList['backtest'][0].loc[cfg.posList[pos].pair][tTrans].ts
+                    cfg.posList[pos].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
+                    if cfg.posList[pos].log.loc[t].vol == 0:
+                        cfg.posList[pos].status = 'c'
+                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[t] = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] + cp
                 if cfg.posList[pos].broker == "oanda":
                     client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                     data = \
@@ -131,7 +149,6 @@ class Translator(object):
                                 if cfg.posList[i].log.loc[t].vol == 0:
                                     cfg.posList[i].status = 'c'
                                 cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
-                                print(oCl)
                         if "tradeReduced" in oT.keys():
                             oRe = oT["tradeReduced"]
                             iL = [j for j in range(cfg.posList.__len__()) if
@@ -250,7 +267,7 @@ class Translator(object):
     def initTick(self, broker, accountID):
         if broker == 'backtest':
             cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}
-            cfg.priceList['backtest']['accounts'][accountID]['buffer'] = {}
+            cfg.brokerList['backtest']['accounts'][accountID]['buffer'] = {}
             for pair in cfg.pairList:
                 cfg.priceList['backtest']['accounts'][accountID]['log'] = pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
                                                               'bid': [None for i in range(cfg.pairList.__len__())],

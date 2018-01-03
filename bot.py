@@ -43,7 +43,7 @@ while pd.Timestamp.now(tz = 'utc') <= timeStop:
 
 posLogL = pd.DataFrame([p.log for p in cfg.posList])
 posLog = pd.concat(posLogL, keys = list(range(1, posLogL.__len__() + 1)))
-with ExcelWriter('positions.xlsx') as outfile:
+with pd.ExcelWriter('positions.xlsx') as outfile:
     posLog.to_excel(outfile)
 
 brokerL = []
@@ -56,5 +56,5 @@ for broker in cfg.brokerList:
     ind += 1
 index = pd.MultiIndex.from_tuples(bIndex, names=['broker', 'account'])
 brokerLog = pd.concat(brokerL, keys = index)
-with ExcelWriter('accounts.xlsx') as outfile:
+with pd.ExcelWriter('accounts.xlsx') as outfile:
     brokerLog.to_excel(outfile)

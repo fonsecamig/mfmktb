@@ -23,7 +23,7 @@ class Translator(object):
     def __init__(self):
         pass
 
-    def initAccount(self, broker, token, btpath, btfilelist, btcurr = 'USD', btamount = 100000, btmargin = 0.02, btstart = pd.Timestamp.now(tz = 'utc'), btend = pd.Timestamp('2000-01-01T00:00', tz = 'utc')):
+    def initAccount(self, broker, token, btpath = './', btfilelist = [], btcurr = 'USD', btamount = 100000, btmargin = 0.02, btstart = pd.Timestamp.now(tz = 'utc'), btend = pd.Timestamp('2000-01-01T00:00', tz = 'utc')):
         if broker == 'backtest': # Introduce pairs in config.py
             cfg.brokerList['backtest']['accounts'] = []
             cfg.brokerList['backtest'] = {'path': btpath, 'filelist': btfilelist}

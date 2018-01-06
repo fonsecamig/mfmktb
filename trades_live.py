@@ -87,7 +87,7 @@ if chc == 'streamprice':
         }
     r = pricing.PricingStream(accountID=accountID, params=params)
     rv = api.request(r)
-    maxrecs = 10
+    maxrecs = 1000
     for ticks in rv:
         maxrecs -= 1
         print(json.dumps(ticks, indent=4), ",")

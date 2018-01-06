@@ -53,7 +53,7 @@ class Translator(object):
                 cfg.posList.append(
                     Position('backtest', accountID, 0, pair, price, vol, typeP, cfg.priceList['backtest'][0].loc[pair].ts))
                 cfg.posList[-1].status = 'o'
-                cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[pd.Timestamp(oT["time"])] = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] - price * vol
+                cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest'][0]] = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] - price * vol
             if broker == "oanda":
                 client = oandapyV20.API(access_token = cfg.brokerList['oanda']['token'])
                 if typeP == 'l':
@@ -192,8 +192,13 @@ class Translator(object):
                     typePos = 'l'
                 else:
                     typePos = 's'
-                cfg.posList.append(Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
-                cfg.posList[-1].status = 'o'
+                pList = [cfg.posList.index(p) for p in cfg.posList if p.broker == 'oanda' and p.account == accountID and p.posID == oT["id"]]
+                if pList == []:
+                    cfg.posList.append(Position('oanda', accountID, oT["id"], oT["instrument"], float(oT["price"]), abs(float(oT["initialUnits"])), typePos, pd.Timestamp(oT["openTime"])))
+                    pInd = -1
+                else:
+                    pInd = pList[0]
+                cfg.posList[pInd].status = 'o'
                 if "closingTransactionIDs" in oT.keys():
                     for cT in oT["closingTransactionIDs"]:
                         rc = trans.TransactionDetails(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], transactionID = cT)
@@ -201,18 +206,19 @@ class Translator(object):
                         replyt = dict(rc.response)
                         if "tradeReduced" in replyt["transaction"].keys():
                             oRe = replyt["transaction"]["tradeReduced"]
-                            v = cfg.posList[-1].log.iloc[-1,].vol - abs(float(oRe["units"]))
+                            v = cfg.posList[pInd].log.iloc[-1,].vol - abs(float(oRe["units"]))
                             p = replyt["transaction"]["price"]
                             cp = float(oRe["realizedPL"])
                             comm = float(replyt["transaction"]["commission"])
                             t = pd.Timestamp(replyt["transaction"]["time"])
-                            cfg.posList[-1].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
-            tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
-            cfg.brokerList['oanda']['accounts'][accountID]['tsv'] = client.request(tstream)
+                            cfg.posList[pInd].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
+            # tstream = trans.TransactionsStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'])
+            # cfg.brokerList['oanda']['accounts'][accountID]['tsv'] = client.request(tstream)
 
     def updatePosLog(self, broker, accountID):
         if broker == 'oanda':
             oT = dict(cfg.brokerList['oanda']['accounts'][accountID]['tsv'].__next__())
+            print(oT)
             if oT["type"] == "ORDER_FILL":
                 if "tradeOpened" in oT.keys():
                     oC = oT["tradeOpened"]
@@ -330,12 +336,14 @@ class Translator(object):
                     pass
         if broker == 'oanda':
             pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
+            print(pS)
             if pS["type"] == "PRICE":
                 p = pS["instrument"]
                 a = float(pS["asks"][0]['price'])
                 b = float(pS["bids"][0]['price'])
                 t = pd.Timestamp(pS["time"])
                 cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
+                self.initPosLog(broker, accountID)
 
     def histPrice(self, broker, accountID, pair, t0, t1 = None, gran = 'M10'):
         if broker == 'oanda':

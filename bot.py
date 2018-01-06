@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import trade as td
-import strategies as stratg
+import strategiespriv as stratg
 import json
+import requests
+import urllib3
 import config as cfg
 
 def auth():
@@ -16,8 +18,8 @@ accountID, access_token = auth()
 
 transl = td.Translator()
 
-cfg.pairList = ["EUR_USD", "GBP_USD", "USD_CAD", "GBP_CHF"]
-strategy = stratg.TestStrategy(10, 0.01, 0.00025, 0.5)
+cfg.pairList = ["EUR_USD", "GBP_USD"]
+strategy = stratg.Gasoline(10, 0.01, 0.00025, 0.5, 2)
 dur = pd.Timedelta(days = 7)
 
 transl.initAccount('oanda', access_token)
@@ -33,11 +35,12 @@ while pd.Timestamp.now(tz = 'utc') <= timeStop:
         for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
             try:
                 transl.tick(broker, acc)
+                print(pd.Timestamp.now())
+                print(cfg.priceList[broker][acc])
                 print([(p.log, p.status) for p in cfg.posList])
                 print(strategy.advice())
                 transl.execute(strategy.advice())
-                transl.updatePosLog(broker, acc)
-            except ConnectionResetError:
+            except (ConnectionResetError, urllib3.exceptions.ProtocolError, requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.ChunkedEncodingError):
                 transl.initPosLog(broker, acc)
                 transl.initTick(broker, acc)
 

@@ -335,15 +335,16 @@ class Translator(object):
                 except StopIteration:
                     pass
         if broker == 'oanda':
-            pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
-            print(pS)
-            if pS["type"] == "PRICE":
-                p = pS["instrument"]
-                a = float(pS["asks"][0]['price'])
-                b = float(pS["bids"][0]['price'])
-                t = pd.Timestamp(pS["time"])
-                cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
-                self.initPosLog(broker, accountID)
+            self.initTick(broker, accountID)
+            # pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
+            # print(pS)
+            # if pS["type"] == "PRICE":
+            #     p = pS["instrument"]
+            #     a = float(pS["asks"][0]['price'])
+            #     b = float(pS["bids"][0]['price'])
+            #     t = pd.Timestamp(pS["time"])
+            #     cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
+            self.initPosLog(broker, accountID)
 
     def histPrice(self, broker, accountID, pair, t0, t1 = None, gran = 'M10'):
         if broker == 'oanda':

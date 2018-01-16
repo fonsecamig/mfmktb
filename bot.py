@@ -23,12 +23,14 @@ strategy = stratg.Gasoline(10, 0.01, 0.00025, 0.5, 2)
 dur = pd.Timedelta(days = 7)
 
 transl.initAccount('oanda', access_token)
+cfg.brokerList['oanda'] = cfg.brokerList['oanda'][0]
 
 for broker in cfg.brokerList:
     for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
-        transl.initPosLog(broker, acc)
         transl.initTick(broker, acc)
+        transl.initPosLog(broker, acc)
 
+strategy.initiate()
 timeStop = pd.Timestamp.now(tz = 'utc') + dur
 while pd.Timestamp.now(tz = 'utc') <= timeStop:
     for broker in cfg.brokerList:

@@ -27,12 +27,12 @@ class Translator(object):
     def initAccount(self, broker, token, btpath='./', btfilelist=[], btcurr='USD', btamount=100000, btmargin=0.02,
                     btstart=pd.Timestamp.now(tz='utc'), btend=pd.Timestamp('2000-01-01T00:00', tz='utc')):
         if broker == 'backtest':  # Introduce pairs in config.py
-            cfg.brokerList['backtest']['accounts'] = []
-            cfg.brokerList['backtest'] = {'path': btpath, 'filelist': btfilelist}
+            cfg.brokerList['backtest'] = {'path': btpath, 'filelist': btfilelist, 'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0, 'tsv': None, 'psv': None,
                                                        'margin': btmargin,
                                                        'curr': btcurr,
-                                                       'log': pd.Series([btamount], index=[btstart])}]
+                                                       'initAmount': btamount,
+                                                       'log': pd.DataFrame({'balance': [], 'NAV': []}, index=[])}]
         if broker == 'oanda':
             client = oandapyV20.API(access_token=token)
             r = accounts.AccountList()
@@ -50,16 +50,26 @@ class Translator(object):
                      'curr': rav["account"]["currency"], 'log': pd.DataFrame(
                         {'bal': [float(rav["account"]["balance"])], 'NAV': [float(rav["account"]["NAV"])],
                          'mused': [float(rav["account"]["marginUsed"])]}, index=[pd.Timestamp.now(tz='utc')])})
+                cfg.priceList['oanda']['accounts'].append(None)
 
-    def open(self, broker, accountID, typeP, pair, vol, price, slip):
+    def open(self, broker, accountID, typeP, pair, vol, price, slip): # Falta log
         try:
             if broker == "backtest":
-                cfg.posList.append(
-                    Position('backtest', accountID, 0, pair, price, vol, typeP,
-                             cfg.priceList['backtest'][0].loc[pair].ts))
+                cfg.posList.append(Position('backtest', accountID, str(accountID), pair, price, vol, typeP, cfg.priceList['backtest']['accounts'][accountID].ts.max()))
                 cfg.posList[-1].status = 'o'
-                cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest'][0]] = \
-                cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] - price * vol
+                if pair[-3:] == cfg.brokerList[broker]['accounts'][accountID]['curr']:
+                    conv = 1
+                elif ('_').join([pair[-3:], cfg.brokerList[broker]['accounts'][accountID]['curr']]) in \
+                        cfg.priceList[broker]['accounts'][accountID].index:
+                    conv = cfg.priceList[broker]['accounts'][accountID].bid[
+                        ('_').join([pair[-3:], cfg.brokerList[broker]['accounts'][accountID]['curr']])]
+                elif ('_').join([cfg.brokerList[broker]['accounts'][accountID]['curr'], pair[-3:]]) in \
+                        cfg.priceList[broker]['accounts'][accountID].index:
+                    conv = cfg.priceList[broker]['accounts'][accountID].ask[('_').join(
+                        [cfg.brokerList[broker]['accounts'][accountID]['curr'], pair[-3:]])] ** (-1)
+                bal = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1, ].balance - price * vol * conv
+                nav = bal + pd.Series([po.tick() for po in cfg.posList if po.status == 'o']).sum()
+                cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest']['accounts'][accountID].ts.max()] = {'balance': bal, 'NAV': nav}
             if broker == "oanda":
                 client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
                 if typeP == 'l':
@@ -116,20 +126,26 @@ class Translator(object):
         try:
             if vol <= cfg.posList[pos].log.iloc[-1,].at['vol']:
                 if cfg.posList[pos].broker == "backtest":
-                    if cfg.posList[pos].typePos == 'l':
-                        tTrans = 'bid'
-                    if cfg.posList[pos].typePos == 's':
-                        tTrans = 'ask'
-                    v = cfg.posList[pos].log.iloc[-1,].vol - vol
-                    p = cfg.priceList['backtest'][0].loc[cfg.posList[pos].pair][tTrans]
-                    cp = cfg.posList[pos].log.loc[-1].closedprof + v * p
-                    comm = 0
-                    t = cfg.priceList['backtest'][0].loc[cfg.posList[pos].pair][tTrans].ts
-                    cfg.posList[pos].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
-                    if cfg.posList[pos].log.loc[t].vol == 0:
-                        cfg.posList[pos].status = 'c'
-                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[t] = \
-                    cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1] + cp
+                    if cfg.priceList['backtest']['accounts'][accountID].loc[cfg.posList[pos].pair].ts > cfg.posList[pos].log.index[-1]:
+                        if cfg.posList[pos].typePos == 'l':
+                            tTrans = 'bid'
+                        if cfg.posList[pos].typePos == 's':
+                            tTrans = 'ask'
+                        v = cfg.posList[pos].log.iloc[-1,].vol - vol
+                        p = cfg.priceList['backtest']['accounts'][accountID].loc[cfg.posList[pos].pair][tTrans]
+                        cp = cfg.posList[pos].log.iloc[-1,].closedprof + cfg.posList[pos].pl(p)
+                        comm = 0
+                        t = cfg.priceList['backtest']['accounts'][accountID].ts.max()
+                        print(v, p, cp, t)
+                        cfg.posList[pos].log.loc[t] = {'vol': v, 'price': p, 'closedprof': cp, 'commission': comm}
+                        if cfg.posList[pos].log.loc[t].vol == 0:
+                            cfg.posList[pos].status = 'c'
+                        # cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[t] = {'balance': cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1,].balance + cp, 'NAV': None}
+                        bal = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1,].balance + cfg.posList[pos].tick()
+                        nav = bal + pd.Series(
+                            [po.tick() for po in cfg.posList if po.status == 'o']).sum()
+                        cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[
+                            cfg.priceList['backtest']['accounts'][accountID].ts.max()] = {'balance': bal, 'NAV': nav}
                 if cfg.posList[pos].broker == "oanda":
                     client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
                     data = \
@@ -294,46 +310,61 @@ class Translator(object):
         if broker == 'backtest':
             cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}
             cfg.brokerList['backtest']['accounts'][accountID]['buffer'] = {}
-            for pair in cfg.pairList:
-                cfg.priceList['backtest']['accounts'][accountID]['log'] = pd.DataFrame(
-                    {'ask': [None for i in range(cfg.pairList.__len__())],
-                     'bid': [None for i in range(cfg.pairList.__len__())],
-                     'ts': [None for i in range(cfg.pairList.__len__())]}, index=cfg.pairList)
+            cfg.priceList['backtest'] = {'accounts': [pd.DataFrame(
+                {'ask': [],
+                 'bid': [],
+                 'ts': []}, index=[])]}
             for file in cfg.brokerList['backtest']['filelist']:
                 cfg.brokerList['backtest']['accounts'][accountID]['psv'][file] = csv.DictReader(
                     open(cfg.brokerList['backtest']['path'] + file), fieldnames=['pair', 'date', 'bid', 'ask'])
                 cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file] = \
                 cfg.brokerList['backtest']['accounts'][accountID]['psv'][file].__next__()
-                if cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.dct['backtest'][
-                    cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]].ts is None:
-                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.dct['backtest'][
+                if cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']] not in cfg.priceList['backtest']['accounts'][accountID].index:
+                    cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = {'ask': None, 'bid': None, 'ts': None}
+                    cfg.pairList.append(cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']])
+                if cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]].ts is None:
+                    cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
+                        {
+                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
+                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
+                            'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
+                        }
+                elif cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][
+                    cfg.brokerList['backtest']['accounts'][accountID]['accounts'][accountID]['buffer'][file]['pair']]].ts < pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']):
+                    cfg.priceList['backtest'][accountID].loc[cfg.dctInv['backtest'][
                         cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
                         {
                             'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
                             'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
-                            'ts': pd.Timestamp(
-                                cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
+                            'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
                         }
-                elif cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.dct['backtest'][
-                    cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]].ts < pd.Timestamp(
-                        cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']):
-                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.dct['backtest'][
-                        cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
-                        {
-                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
-                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
-                            'ts': pd.Timestamp(
-                                cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
-                        }
+            cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest']['accounts'][accountID].ts.min()] = {
+                    'balance': cfg.brokerList['backtest']['accounts'][accountID]['initAmount'],
+                    'NAV': cfg.brokerList['backtest']['accounts'][accountID]['initAmount']}
         if broker == 'oanda':
-            cfg.priceList['oanda'][accountID] = pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
+            cfg.priceList['oanda']['accounts'][accountID] = pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
                                                               'bid': [None for i in range(cfg.pairList.__len__())],
                                                               'ts': [None for i in range(cfg.pairList.__len__())]},
                                                              index=cfg.pairList)
             client = API(access_token=cfg.brokerList['oanda']['token'])
+            r = accounts.AccountInstruments(accountID=cfg.brokerList['oanda']['accounts'][accountID]['ID'])
+            rv = dict(client.request(r))
+            instList = [inst["name"] for inst in rv["instruments"]]
+            for ipair in cfg.priceList['oanda']['accounts'][accountID].index.tolist():
+                if '_'.join([ipair[0:3], cfg.brokerList['oanda']['accounts'][accountID]['curr']]) not in instList:
+                    if '_'.join([ipair[0:3], cfg.brokerList['oanda']['accounts'][accountID]['curr']]) in instList:
+                        cfg.priceList['oanda']['accounts'][accountID].loc[
+                            '_'.join([ipair[0:3], cfg.brokerList['oanda']['accounts'][accountID]['curr']])] = {'ask': None,
+                                                                                                    'bid': None,
+                                                                                                    'ts': None}
+                    elif '_'.join([cfg.brokerList['oanda']['accounts'][accountID]['curr'], ipair[0:3]]) in instList:
+                        cfg.priceList['oanda']['accounts'][accountID].loc[
+                            '_'.join([cfg.brokerList['oanda']['accounts'][accountID]['curr'], ipair[0:3]])] = {'ask': None,
+                                                                                                    'bid': None,
+                                                                                                    'ts': None}
             parstreamtrans = \
                 {
-                    "instruments": ",".join(cfg.pairList)
+                    "instruments": ",".join(cfg.priceList['oanda']['accounts'][accountID].index)
                 }
             r = pricing.PricingInfo(accountID=cfg.brokerList['oanda']['accounts'][accountID]['ID'],
                                     params=parstreamtrans)
@@ -343,30 +374,51 @@ class Translator(object):
                 a = float(ipair["asks"][0]['price'])
                 b = float(ipair["bids"][0]['price'])
                 t = pd.Timestamp(ipair["time"])
-                cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
+                cfg.priceList['oanda']['accounts'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
             # pstream = pricing.PricingStream(accountID = cfg.brokerList['oanda']['accounts'][accountID]['ID'], params = parstreamtrans)
             # cfg.brokerList['oanda']['accounts'][accountID]['psv'] = client.request(pstream)
 
     def tick(self, broker, accountID):
         if broker == 'backtest':
             if cfg.brokerList['backtest']['accounts'][accountID]['psv'] != []:
-                fN = pd.Series(
-                    [pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']) for file in
-                     cfg.brokerList['backtest']['accounts'][accountID]['buffer']]).idxmin()
+                fN = pd.Series([pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']) for file in
+                     cfg.brokerList['backtest']['accounts'][accountID]['buffer']], index=cfg.brokerList['backtest']['filelist']).idxmin()
                 try:
-                    cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN] = \
-                        cfg.brokerList['backtest']['accounts'][accountID]['psv'][fN].__next__()
-                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[
-                        cfg.dct['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN]['pair']]] = \
+                    cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN] = cfg.brokerList['backtest']['accounts'][accountID]['psv'][fN].__next__()
+                    fNP = pd.Series(
+                        [pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']) for
+                         file in
+                         cfg.brokerList['backtest']['accounts'][accountID]['buffer']],
+                        index=cfg.brokerList['backtest']['filelist']).idxmin()
+                    cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][
+                        cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['pair']]] = \
                         {
-                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN]['ask']),
-                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN]['bid']),
-                            'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN]['date'])
+                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['ask']),
+                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['bid']),
+                            'ts': pd.Timestamp(
+                                cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['date'])
                         }
+                    bal = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1,].balance
+                    nav = bal + pd.Series([po.tick() for po in cfg.posList if po.status == 'o']).sum()
+                    cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[
+                        cfg.priceList['backtest']['accounts'][accountID].ts.max()] = {'balance': bal, 'NAV': nav}
                 except StopIteration:
                     pass
         if broker == 'oanda':
-            self.initTick(broker, accountID)
+            client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
+            parstreamtrans = \
+                {
+                    "instruments": ",".join(cfg.priceList['oanda']['accounts'][accountID].index)
+                }
+            r = pricing.PricingInfo(accountID=cfg.brokerList['oanda']['accounts'][accountID]['ID'],
+                                    params=parstreamtrans)
+            rv = dict(client.request(r))
+            for ipair in rv["prices"]:
+                p = ipair["instrument"]
+                a = float(ipair["asks"][0]['price'])
+                b = float(ipair["bids"][0]['price'])
+                t = pd.Timestamp(ipair["time"])
+                cfg.priceList['oanda']['accounts'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
             # pS = dict(cfg.brokerList['oanda']['accounts'][accountID]['psv'].__next__())
             # print(pS)
             # if pS["type"] == "PRICE":
@@ -376,13 +428,12 @@ class Translator(object):
             #     t = pd.Timestamp(pS["time"])
             #     cfg.priceList['oanda'][accountID].loc[p] = {'ask': a, 'bid': b, 'ts': t}
             self.initPosLog(broker, accountID)
-            client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
             rv = accounts.AccountSummary(cfg.brokerList['oanda']['accounts'][accountID]['ID'])
             client.request(rv)
             r = dict(rv.response)
-            print(r)
-            cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[cfg.priceList['oanda'][accountID].ts.max()] = {
-                'bal': float(r["account"]["balance"]), 'NAV': float(r["account"]["NAV"]),
+            cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[cfg.priceList['oanda']['accounts'][accountID].ts.max()] = {
+                'bal': float(r["account"]["balance"]),
+                'NAV': float(r["account"]["NAV"]),
                 'mused': float(0)}
 
     def histPrice(self, broker, accountID, pair, t0, t1=None, gran='M10'):
@@ -451,17 +502,26 @@ class Position(object):
         # self.log = pd.Series([np.NaN, np.NaN],index = ['entry', 'exit'])
 
     def tick(self):
-        return (self.pl(cfg.priceList[self.broker][self.account].ask[self.pair]))
+        if self.typePos == 'l':
+            return (self.pl(cfg.priceList[self.broker]['accounts'][self.account].bid[self.pair]))
+        if self.typePos == 's':
+            return (self.pl(cfg.priceList[self.broker]['accounts'][self.account].ask[self.pair]))
         # if self.typePos == 'l':
         #     return(self.log.closedprof[-1] + self.tradeVol * cfg.priceList[self.broker][self.account].ask[self.pair])
         # if self.typePos == 's':
         #     return(self.log.closedprof[-1] - self.tradeVol * cfg.priceList[self.broker][self.account].bid[self.pair])
 
     def pl(self, p):
+        if self.pair[-3:] == cfg.brokerList[self.broker]['accounts'][self.account]['curr']:
+            conv = 1
+        elif ('_').join([self.pair[-3:], cfg.brokerList[self.broker]['accounts'][self.account]['curr']]) in cfg.priceList[self.broker]['accounts'][self.account].index:
+            conv = cfg.priceList[self.broker]['accounts'][self.account].bid[('_').join([self.pair[-3:], cfg.brokerList[self.broker]['accounts'][self.account]['curr']])]
+        elif ('_').join([cfg.brokerList[self.broker]['accounts'][self.account]['curr'], self.pair[-3:]]) in cfg.priceList[self.broker]['accounts'][self.account].index:
+            conv = cfg.priceList[self.broker]['accounts'][self.account].ask[('_').join([cfg.brokerList[self.broker]['accounts'][self.account]['curr'], self.pair[-3:]])] ** (-1)
         if self.typePos == 'l':
-            return (self.log.closedprof[-1] + self.tradeVol * p)
+            return self.log.closedprof[-1] + (self.log.iloc[-1,].vol * (p - self.initPrice)) * conv
         if self.typePos == 's':
-            return (self.log.closedprof[-1] - self.tradeVol * p)
+            return self.log.closedprof[-1] - (self.log.iloc[-1,].vol * (p - self.initPrice)) * conv
 
     # def closePos(self, vol):
     #     self.transl.close(self.broker, self.account, cfg.brokerList[self.broker]["token"], self, vol)

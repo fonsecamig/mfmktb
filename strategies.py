@@ -14,15 +14,19 @@ class TestStrategy(object):
         self.perProfit = perProfit
         self.perLoss = perLoss
 
+    def initiate(self):
+        pass
+
     def advice(self):
         orders = []
         for broker in cfg.brokerList:
             for acc in range(cfg.brokerList[broker]["accounts"].__len__()):
                 for pair in cfg.pairList:
                     pList = [cfg.posList.index(pos) for pos in cfg.posList if pos.broker == broker and pos.account == acc and pos.pair == pair and pos.status == 'o']
+                    print(pList)
                     if pList == []:
                         orders.append({'oType': 'o', 'broker': broker, 'account': acc, 'type': 'l', 'pair': pair, 'vol': self.volTest,
-                                       'price': cfg.priceList[broker][acc].loc[pair]['ask'], 'slip': self.slip})
+                                       'price': cfg.priceList[broker]['accounts'][acc].loc[pair]['ask'], 'slip': self.slip})
                     elif pList.__len__() == 1:
                         if cfg.posList[pList[0]].tick() / (cfg.posList[pList[0]].initPrice * cfg.posList[pList[0]].initVol) - 1 < -self.perProfit:
                             orders.append(
@@ -33,9 +37,10 @@ class TestStrategy(object):
                                 tPos ='l'
                             orders.append({'oType': 'o', 'broker': broker, 'account': acc, 'type': tPos, 'pair': pair,
                                            'vol': self.volTest,
-                                           'price': cfg.priceList[broker][acc].loc[pair]['ask'], 'slip': self.slip})
+                                           'price': cfg.priceList[broker]['accounts'][acc].loc[pair]['ask'], 'slip': self.slip})
                     else:
-                        profitLPer = pd.Series([cfg.posList[pList[p]].tick() / (cfg.posList[pList[p]].initPrice * cfg.posList[pList[p]].initVol) - 1 for p in pList])
+                        profitLPer = pd.Series([cfg.posList[p].tick() / (cfg.posList[p].initPrice * cfg.posList[p].initVol) - 1 for p in pList])
+                        print(profitLPer)
                         if profitLPer.max() > self.perProfit:
                             if cfg.posList[pList[-1]] == 'l':
                                 priceT = 'ask'

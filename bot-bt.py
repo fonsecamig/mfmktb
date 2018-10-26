@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 import trade as td
-import strategiespriv as stratg
+import strategies as stratg
 import json
 import requests
-import urllib3
 import config as cfg
 
 transl = td.Translator()
@@ -33,7 +32,7 @@ while cfg.brokerList['backtest']['accounts'][0]['psv'] != []:
                 print([p.log for p in cfg.posList])
                 print(strategy.advice())
                 transl.execute(strategy.advice())
-            except (ConnectionResetError, urllib3.exceptions.ProtocolError, requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.ChunkedEncodingError):
+            except (ConnectionResetError, requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.ChunkedEncodingError):
                 transl.initPosLog(broker, acc)
                 transl.initTick(broker, acc)
 

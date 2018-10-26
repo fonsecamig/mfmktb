@@ -16,5 +16,3 @@ dctInv['backtest'] = \
         'EUR/USD': 'EUR_USD',
         'USD/JPY': 'USD_JPY'
     }
-
-pred = {}

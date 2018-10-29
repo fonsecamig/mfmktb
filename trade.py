@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import json
@@ -247,6 +246,8 @@ class Translator(object):
             # cfg.brokerList['oanda']['accounts'][accountID]['tsv'] = client.request(tstream)
 
     def updatePosLog(self, broker, accountID):
+        if broker == 'backtest':
+            pass
         if broker == 'oanda':
             oT = dict(cfg.brokerList['oanda']['accounts'][accountID]['tsv'].__next__())
             print(oT)
@@ -438,6 +439,8 @@ class Translator(object):
                 'mused': float(0)}
 
     def histPrice(self, broker, accountID, pair, t0, t1=None, gran='M10'):
+        if broker =='backtest':
+
         if broker == 'oanda':
             t0Str = t0.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
             if t1 == None:

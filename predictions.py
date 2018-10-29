@@ -5,3 +5,11 @@ import pandas as pd
 import json
 import requests
 
+class Predict(object):
+    """
+
+    """
+
+    def __init__(self):
+        pass
+

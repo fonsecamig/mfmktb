@@ -4,6 +4,7 @@ import trade as td
 import strategies as stratg
 import json
 import requests
+
 import config as cfg
 
 transl = td.Translator()

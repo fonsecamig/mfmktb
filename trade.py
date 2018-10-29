@@ -24,11 +24,18 @@ class Translator(object):
     def __init__(self):
         pass
 
-    def initAccount(self, broker, token, btpath='./', btfilelist=[], btcurr='USD', btamount=100000, btmargin=0.02,
+    def initAccount(self, broker, token, iYear, iMonth, fYear, fMonth, btpath='./', btcurr='USD', btamount=100000, btmargin=0.02,
                     btstart=pd.Timestamp.now(tz='utc'), btend=pd.Timestamp('2000-01-01T00:00', tz='utc')):
         if broker == 'backtest':  # Introduce pairs in config.py
-            cfg.brokerList['backtest'] = {'path': btpath, 'filelist': btfilelist, 'accounts': []}
-            cfg.brokerList['backtest']['accounts'] = [{'ID': 0, 'tsv': None, 'psv': None,
+            cfg.brokerList['backtest'] = {'path': btpath,
+                                          'iYear': iYear,
+                                          'iMonth': iMonth,
+                                          'fYear': fYear,
+                                          'fMonth': fMonth,
+                                          'accounts': []}
+            cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
+                                                       'tsv': None,
+                                                       'psv': None,
                                                        'margin': btmargin,
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
@@ -308,41 +315,51 @@ class Translator(object):
                         cfg.posList[i].status = 'c'
                     cfg.brokerList['oanda']['accounts'][accountID]['log'].loc[t] = float(oT["accountBalance"])
 
-    def initTick(self, broker, accountID):
+    def initTick(self, broker, accountID, iYear, iMonth, fYear, fMonth):
         if broker == 'backtest':
-            cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}
-            cfg.brokerList['backtest']['accounts'][accountID]['buffer'] = {}
-            cfg.priceList['backtest'] = {'accounts': [pd.DataFrame(
-                {'ask': [],
-                 'bid': [],
-                 'ts': []}, index=[])]}
-            for file in cfg.brokerList['backtest']['filelist']:
-                cfg.brokerList['backtest']['accounts'][accountID]['psv'][file] = csv.DictReader(
-                    open(cfg.brokerList['backtest']['path'] + file), fieldnames=['pair', 'date', 'bid', 'ask'])
-                cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file] = \
-                cfg.brokerList['backtest']['accounts'][accountID]['psv'][file].__next__()
-                if cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']] not in cfg.priceList['backtest']['accounts'][accountID].index:
-                    cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = {'ask': None, 'bid': None, 'ts': None}
-                    cfg.pairList.append(cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']])
-                if cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]].ts is None:
-                    cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
-                        {
-                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
-                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
-                            'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
-                        }
-                elif cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][
-                    cfg.brokerList['backtest']['accounts'][accountID]['accounts'][accountID]['buffer'][file]['pair']]].ts < pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']):
-                    cfg.priceList['backtest'][accountID].loc[cfg.dctInv['backtest'][
-                        cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
-                        {
-                            'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
-                            'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
-                            'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
-                        }
-            cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest']['accounts'][accountID].ts.min()] = {
-                    'balance': cfg.brokerList['backtest']['accounts'][accountID]['initAmount'],
-                    'NAV': cfg.brokerList['backtest']['accounts'][accountID]['initAmount']}
+            for year in range(iYear, fYear - iYear):
+                if year == iYear:
+                    rngMonth = range(iMonth, 12)
+                elif year == fYear:
+                    rngMonth = range(1, fMonth)
+                else:
+                    rngMonth = range(1, 12)
+                for month in rngMonth:
+
+
+            # cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}
+            # cfg.brokerList['backtest']['accounts'][accountID]['buffer'] = {}
+            # cfg.priceList['backtest'] = {'accounts': [pd.DataFrame(
+            #     {'ask': [],
+            #      'bid': [],
+            #      'ts': []}, index=[])]}
+            # for file in cfg.brokerList['backtest']['filelist']:
+            #     cfg.brokerList['backtest']['accounts'][accountID]['psv'][file] = csv.DictReader(
+            #         open(cfg.brokerList['backtest']['path'] + file), fieldnames=['pair', 'date', 'bid', 'ask'])
+            #     cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file] = \
+            #     cfg.brokerList['backtest']['accounts'][accountID]['psv'][file].__next__()
+            #     if cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']] not in cfg.priceList['backtest']['accounts'][accountID].index:
+            #         cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = {'ask': None, 'bid': None, 'ts': None}
+            #         cfg.pairList.append(cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']])
+            #     if cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]].ts is None:
+            #         cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
+            #             {
+            #                 'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
+            #                 'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
+            #                 'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
+            #             }
+            #     elif cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][
+            #         cfg.brokerList['backtest']['accounts'][accountID]['accounts'][accountID]['buffer'][file]['pair']]].ts < pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']):
+            #         cfg.priceList['backtest'][accountID].loc[cfg.dctInv['backtest'][
+            #             cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['pair']]] = \
+            #             {
+            #                 'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['ask']),
+            #                 'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['bid']),
+            #                 'ts': pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date'])
+            #             }
+            # cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[cfg.priceList['backtest']['accounts'][accountID].ts.min()] = {
+            #         'balance': cfg.brokerList['backtest']['accounts'][accountID]['initAmount'],
+            #         'NAV': cfg.brokerList['backtest']['accounts'][accountID]['initAmount']}
         if broker == 'oanda':
             cfg.priceList['oanda']['accounts'][accountID] = pd.DataFrame({'ask': [None for i in range(cfg.pairList.__len__())],
                                                               'bid': [None for i in range(cfg.pairList.__len__())],

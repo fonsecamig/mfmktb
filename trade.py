@@ -36,7 +36,7 @@ class Translator(object):
     def __init__(self):
         pass
 
-    def initAccount(self, broker, token, iYear, iMonth, fYear, fMonth, btpath='./', btcurr='USD', btamount=100000, btmargin=0.02,
+    def initAccount(self, broker, token, iYear, iMonth, fYear, fMonth, gran, btpath='./', btcurr='USD', btamount=100000, btmargin=0.02,
                     btstart=pd.Timestamp.now(tz='utc'), btend=pd.Timestamp('2000-01-01T00:00', tz='utc')):
         if broker == 'backtest':  # Introduce pairs in config.py
             cfg.brokerList['backtest'] = {'path': btpath,
@@ -44,10 +44,11 @@ class Translator(object):
                                           'iMonth': iMonth,
                                           'fYear': fYear,
                                           'fMonth': fMonth,
+                                          'gran': gran,
                                           'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
-                                                       'tickTable': None,
-                                                       'histTable': None,
+                                                       'tickTable': {'table': None, 'i': -1},
+                                                       'histTable': {'table': None, 'i': -1},
                                                        'margin': btmargin,
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
@@ -342,16 +343,22 @@ class Translator(object):
                         mString = '0' + str(month)
                     else:
                         mString = str(month)
-                        cfg.brokerList['accounts'][accountID]['tickTable'] = pd.DataFrame(None)
+                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = pd.DataFrame(None)
                     for pair in cfg.pairList:
                         filename = cfg.dctPredInv[pair] + '-' + yearStr + '-' + mString + '.csv'
-                        cfg.brokerList['accounts'][accountID]['tickTable'] = \
-                            pd.concat([cfg.brokerList['accounts'][accountID]['tickTable'],
+                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
+                            pd.concat([cfg.brokerList['accounts'][accountID]['tickTable']['table'],
                                        pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
                                                    index_col=1, parse_dates=True, usecols=[2, 3])], axis=1, sort=True)
-                    cfg.brokerList['accounts'][accountID]['tickTable'].columns = \
+                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].columns = \
                         pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])
-                    cfg.brokerList['accounts'][accountID]['tickTable'].fillna(method='bfill', inplace=True)
+                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].fillna(method='bfill',
+                                                                                                   inplace=True)
+                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].dropna(inplace=True)
+                    cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = \
+                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].resample(gran + 'S').\
+                            ohlc()
+
 
 
             # cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}

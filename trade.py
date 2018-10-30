@@ -15,6 +15,17 @@ from oandapyV20.contrib.factories import InstrumentsCandlesFactory
 import config as cfg
 
 
+def nDays(self, y, m):
+    if m in [1, 3, 5, 7, 8, 10, 12]:
+        return 31
+    elif m != 2:
+        return 30
+    else:
+        if y % 4 != 0:
+            return 28
+        else:
+            return 29
+
 # %
 class Translator(object):
     """
@@ -325,6 +336,13 @@ class Translator(object):
                 else:
                     rngMonth = range(1, 12)
                 for month in rngMonth:
+                    yearStr = str(year)
+                    if month < 10:
+                        mString = '0' + str(month)
+                    else:
+                        mString = str(month)
+                    tickDF = pd.DataFrame(None, index=)
+                    for pair in cfg.pairList:
 
 
             # cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}

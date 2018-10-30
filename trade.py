@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import json
@@ -45,8 +46,8 @@ class Translator(object):
                                           'fMonth': fMonth,
                                           'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
-                                                       'tsv': None,
-                                                       'psv': None,
+                                                       'tickTable': None,
+                                                       'histTable': None,
                                                        'margin': btmargin,
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
@@ -341,8 +342,16 @@ class Translator(object):
                         mString = '0' + str(month)
                     else:
                         mString = str(month)
-                    tickDF = pd.DataFrame(None, index=)
+                        cfg.brokerList['accounts'][accountID]['tickTable'] = pd.DataFrame(None)
                     for pair in cfg.pairList:
+                        filename = cfg.dctPredInv[pair] + '-' + yearStr + '-' + mString + '.csv'
+                        cfg.brokerList['accounts'][accountID]['tickTable'] = \
+                            pd.concat([cfg.brokerList['accounts'][accountID]['tickTable'],
+                                       pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
+                                                   index_col=1, parse_dates=True, usecols=[2, 3])], axis=1, sort=True)
+                    cfg.brokerList['accounts'][accountID]['tickTable'].columns = \
+                        pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])
+                    cfg.brokerList['accounts'][accountID]['tickTable'].fillna(method='bfill', inplace=True)
 
 
             # cfg.brokerList['backtest']['accounts'][accountID]['psv'] = {}
@@ -475,7 +484,7 @@ class Translator(object):
 
     def histPrice(self, broker, accountID, pair, t0, t1=None, gran='M10'):
         if broker =='backtest':
-
+            pass
         if broker == 'oanda':
             t0Str = t0.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
             if t1 == None:

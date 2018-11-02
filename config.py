@@ -2,23 +2,47 @@ brokerList = {}
 pairList = []
 posList = []
 priceList = {}
-pred = \
-    {  # Prediction dict
-        'AUD/JPY': None,
-        'AUD/NZD': None,
-        'AUD/USD': None,
-        'CAD/JPY': None,
-        'CHF/JPY': None,
-        'EUR/CHF': None,
-        'EUR/GBP': None,
-        'EUR/JPY': None,
-        'EUR/USD': None,
-        'GBP/JPY': None,
-        'GBP/USD': None,
-        'NZD/USD': None,
-        'USD/CAD': None,
-        'USD/CHF': None,
-        'USD/JPY': None
+history = {'gran': 5,
+           'predInput':
+               {
+                    'AUD/JPY': None,
+                    'AUD/NZD': None,
+                    'AUD/USD': None,
+                    'CAD/JPY': None,
+                    'CHF/JPY': None,
+                    'EUR/CHF': None,
+                    'EUR/GBP': None,
+                    'EUR/JPY': None,
+                    'EUR/USD': None,
+                    'GBP/JPY': None,
+                    'GBP/USD': None,
+                    'NZD/USD': None,
+                    'USD/CAD': None,
+                    'USD/CHF': None,
+                    'USD/JPY': None
+               }
+           }
+prediction = \
+    {
+        'inputSize': 10,
+        'output':
+            {  # Prediction dict
+                'AUD/JPY': None,
+                'AUD/NZD': None,
+                'AUD/USD': None,
+                'CAD/JPY': None,
+                'CHF/JPY': None,
+                'EUR/CHF': None,
+                'EUR/GBP': None,
+                'EUR/JPY': None,
+                'EUR/USD': None,
+                'GBP/JPY': None,
+                'GBP/USD': None,
+                'NZD/USD': None,
+                'USD/CAD': None,
+                'USD/CHF': None,
+                'USD/JPY': None
+            }
     }
 
 dct = {'backtest': {}}

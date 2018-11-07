@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import pandas as pd
 import json
@@ -37,9 +38,9 @@ class Translator(object):
     def __init__(self):
         pass
 
-    def initAccount(self, broker, token, iYear, iMonth, fYear, fMonth, gran, btpath='./', btcurr='USD', btamount=100000,
-                    btmargin=0.02,
-                    btstart=pd.Timestamp.now(tz='utc'), btend=pd.Timestamp('2000-01-01T00:00', tz='utc')):
+    def initAccount(self, broker, token, gran, iYear=2018, iMonth=1, fYear=2018, fMonth=3, btpath='./', btcurr='USD',
+                    btamount=100000,
+                    btmargin=0.02):
         if broker == 'backtest':  # Introduce pairs in config.py
             cfg.brokerList['backtest'] = {'path': btpath,
                                           'iYear': iYear,
@@ -59,23 +60,28 @@ class Translator(object):
                                                        'log': pd.DataFrame({'balance': [], 'NAV': []}, index=[])}]
 
             for pair in cfg.pairList:
-                for year in range(iYear, fYear - iYear):
-                    if year == iYear:
-                        rngMonth = range(iMonth, 12)
-                    elif year == fYear:
-                        rngMonth = range(1, fMonth)
-                    else:
-                        rngMonth = range(1, 12)
+                lst = []
+                for year in range(cfg.brokerList['backtest']['iYear'], cfg.brokerList['backtest']['fYear'] + 1):
+                    yStr = str(year)
+                    initM = 1
+                    finalM = 12
+                    if year == cfg.brokerList['backtest']['iYear']:
+                        initM = cfg.brokerList['backtest']['iMonth']
+                    if year == cfg.brokerList['backtest']['fYear']:
+                        finalM = cfg.brokerList['backtest']['fMonth']
+                    rngMonth = range(initM, finalM + 1)
                     for month in rngMonth:
-                        yStr = str(year)
                         if month < 10:
                             mString = '0' + str(month)
                         else:
                             mString = str(month)
-                        cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list']. \
-                            append('-'.join([cfg.dctPred[pair], yStr, mString]) + '.csv')
-                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = \
-                    iter(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
+                        st = '-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv'
+                        lst.append(copy.copy(st))
+                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'] = copy.copy(lst)
+                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = iter(
+                    cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
+            for pair in cfg.pairList:
+                print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
 
         if broker == 'oanda':
             client = oandapyV20.API(access_token=token)
@@ -358,33 +364,40 @@ class Translator(object):
 
     def initTick(self, broker, accountID):
         if broker == 'backtest':
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = pd.DataFrame(None)
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = pd.DataFrame(None)
             for pair in cfg.pairList:
-                filename = cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'].__next__()
+                filename = cfg.brokerList['backtest']['accounts'][accountID]['filelist'][pair]['iterator'].__next__()
+                file = pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
+                                           index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
+                file = file.groupby(file.index, sort=False).mean()
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                    pd.concat([cfg.brokerList['accounts'][accountID]['tickTable']['table'],
-                               pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
-                                           index_col=1, parse_dates=True, usecols=[2, 3])], axis=1, sort=True)
+                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'], file], axis=1,
+                              copy=False)
+                print('Opened ' + filename)
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].sort_index()
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].columns = \
                 pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].fillna(method='bfill',
                                                                                            inplace=True)
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].dropna(inplace=True)
+            print('Processed tick table')
             firstCandleT = pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']
                                         .index.values[0] + pd.Timedelta(cfg.history['gran'])). \
                 floor(str(cfg.history['gran']) + 's')
             cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = pd.DataFrame(None)
-            for p in cfg.pairList:
+            for pair in cfg.pairList:
                 cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = \
                     pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'],
-                               cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'][p]
+                               cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'][pair]
                               .agg('mean', axis=1).resample(start=firstCandleT, freq=str(cfg.history['gran']) + 's').
                               ohlc()], axis=1)
+                print('Processed ' + pair + ' candles')
             cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'].columns = \
                 pd.MultiIndex.from_product([cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'],
                                             ['o', 'h', 'l', 'c']])
             for p in cfg.pairList:
-                cfg.history['predInput'][p] = cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'][p].iloc[:(cfg.prediction['inputSize'])]
+                cfg.history['predInput'][p] = cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'][
+                                                  p].iloc[:(cfg.prediction['inputSize'])]
             firstTickT = cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']. \
                              loc[(firstCandleT + (cfg.prediction['inputSize'] + 1) * pd.Timedelta(str( \
                 cfg.history['gran']) + 's')):].index[0]
@@ -461,7 +474,8 @@ class Translator(object):
                         [lastLine, cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']])
                     cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].fillna(method='bfill',
                                                                                                    inplace=True)
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].iloc[0:, :]
+                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
+                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].iloc[0:, :]
                 except StopIteration:
                     pass
 

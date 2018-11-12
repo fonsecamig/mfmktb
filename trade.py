@@ -50,17 +50,14 @@ class Translator(object):
                                           'gran': gran,
                                           'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
-                                                       'filelist': dict(zip(cfg.pairList, cfg.pairList.__len__() * [
-                                                           {'list': [], 'iterator': None}])),
+                                                       'filelist': dict(zip(cfg.pairList, cfg.pairList.__len__() * [[]])),
                                                        'tickTable': {'table': None, 'iterator': None},
                                                        'histTable': {'table': None, 'iterator': None},
                                                        'margin': btmargin,
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
                                                        'log': pd.DataFrame({'balance': [], 'NAV': []}, index=[])}]
-
             for pair in cfg.pairList:
-                lst = []
                 for year in range(cfg.brokerList['backtest']['iYear'], cfg.brokerList['backtest']['fYear'] + 1):
                     yStr = str(year)
                     initM = 1
@@ -75,14 +72,17 @@ class Translator(object):
                             mString = '0' + str(month)
                         else:
                             mString = str(month)
-                        st = '-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv'
-                        lst.append(copy.copy(st))
-                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'] = copy.copy(lst)
-                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = iter(
-                    cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
-            for pair in cfg.pairList:
-                print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
-
+                        print(pair)
+                        cfg.brokerList['backtest']['accounts'][0]['filelist'][pair].append(
+                            str('-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv'))
+                        cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = pair
+                        for pair in cfg.pairList:
+                            print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair])
+                # cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = iter(
+                #     cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
+                # for pair in cfg.pairList:
+                #     print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
+                #     print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'].__next__())
         if broker == 'oanda':
             client = oandapyV20.API(access_token=token)
             r = accounts.AccountList()
@@ -367,13 +367,12 @@ class Translator(object):
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = pd.DataFrame(None)
             for pair in cfg.pairList:
                 filename = cfg.brokerList['backtest']['accounts'][accountID]['filelist'][pair]['iterator'].__next__()
+                print(filename)
                 file = pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
-                                           index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
+                                   index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
                 file = file.groupby(file.index, sort=False).mean()
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'], file], axis=1,
-                              copy=False)
-                print('Opened ' + filename)
+                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'], file], axis=1)
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].sort_index()
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].columns = \
                 pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])

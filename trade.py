@@ -50,7 +50,8 @@ class Translator(object):
                                           'gran': gran,
                                           'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
-                                                       'filelist': dict(zip(cfg.pairList, cfg.pairList.__len__() * [[]])),
+                                                       'filelist': dict(
+                                                           zip(cfg.pairList, cfg.pairList.__len__() * [[]])),
                                                        'tickTable': {'table': None, 'iterator': None},
                                                        'histTable': {'table': None, 'iterator': None},
                                                        'margin': btmargin,
@@ -58,6 +59,7 @@ class Translator(object):
                                                        'initAmount': btamount,
                                                        'log': pd.DataFrame({'balance': [], 'NAV': []}, index=[])}]
             for pair in cfg.pairList:
+                lst = []
                 for year in range(cfg.brokerList['backtest']['iYear'], cfg.brokerList['backtest']['fYear'] + 1):
                     yStr = str(year)
                     initM = 1
@@ -73,11 +75,12 @@ class Translator(object):
                         else:
                             mString = str(month)
                         print(pair)
-                        cfg.brokerList['backtest']['accounts'][0]['filelist'][pair].append(
-                            str('-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv'))
-                        cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = pair
+                        st = str('-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv')
+                        lst.append(str(st))
+                        # cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = pair
                         for pair in cfg.pairList:
                             print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair])
+                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = lst
                 # cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = iter(
                 #     cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
                 # for pair in cfg.pairList:

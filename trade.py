@@ -364,7 +364,7 @@ class Translator(object):
         if broker == 'backtest':
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = pd.DataFrame(None)
             for pair in cfg.pairList:
-                filename = cfg.brokerList['backtest']['accounts'][accountID]['filelist'][pair]['iterator'].__next__()
+                filename = cfg.brokerList['backtest']['accounts'][accountID]['fileiter'][pair].__next__()
                 print(filename)
                 file = pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
                                    index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
@@ -386,7 +386,7 @@ class Translator(object):
                 cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = \
                     pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'],
                                cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'][pair]
-                              .agg('mean', axis=1).resample(start=firstCandleT, freq=str(cfg.history['gran']) + 's').
+                              .agg('mean', axis=1).resample(str(cfg.history['gran']) + 'S', kind='period').
                               ohlc()], axis=1)
                 print('Processed ' + pair + ' candles')
             cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'].columns = \

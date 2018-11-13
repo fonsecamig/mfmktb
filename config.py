@@ -3,19 +3,19 @@ pairList = \
     [
         'AUD/JPY',
         'AUD/NZD',
-        'AUD/USD',
-        'CAD/JPY',
-        'CHF/JPY',
-        'EUR/CHF',
-        'EUR/GBP',
-        'EUR/JPY',
-        'EUR/USD',
-        'GBP/JPY',
-        'GBP/USD',
-        'NZD/USD',
-        'USD/CAD',
-        'USD/CHF',
-        'USD/JPY'
+        'AUD/USD'  # ,
+        # 'CAD/JPY',
+        # 'CHF/JPY',
+        # 'EUR/CHF',
+        # 'EUR/GBP',
+        # 'EUR/JPY',
+        # 'EUR/USD',
+        # 'GBP/JPY',
+        # 'GBP/USD',
+        # 'NZD/USD',
+        # 'USD/CAD',
+        # 'USD/CHF',
+        # 'USD/JPY'
     ]
 posList = []
 priceList = {}

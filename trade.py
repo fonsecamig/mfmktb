@@ -74,18 +74,12 @@ class Translator(object):
                             mString = '0' + str(month)
                         else:
                             mString = str(month)
-                        print(pair)
                         st = str('-'.join([cfg.dctPredInv[pair], yStr, mString]) + '.csv')
                         lst.append(str(st))
-                        # cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = pair
-                        for pair in cfg.pairList:
-                            print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair])
-                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = lst
-                # cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'] = iter(
-                #     cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
-                # for pair in cfg.pairList:
-                #     print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['list'])
-                #     print(cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'].__next__())
+                cfg.brokerList['backtest']['accounts'][0]['filelist'][pair] = lst.copy()
+                for p in cfg.pairList:
+                    print(cfg.brokerList['backtest']['accounts'][0]['filelist'][p])
+
         if broker == 'oanda':
             client = oandapyV20.API(access_token=token)
             r = accounts.AccountList()

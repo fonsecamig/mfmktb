@@ -54,8 +54,10 @@ class Translator(object):
                                                            zip(cfg.pairList, cfg.pairList.__len__() * [[]])),
                                                        'fileiter': dict(
                                                            zip(cfg.pairList, cfg.pairList.__len__() * [[]])),
-                                                       'tickTable': {'table': None, 'iterator': None},
-                                                       'histTable': {'table': None, 'iterator': None},
+                                                       'tickTable': None,
+                                                       'tickIter': None,
+                                                       'histTable': None,
+                                                       'histBuffer': None,
                                                        'margin': btmargin,
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
@@ -362,46 +364,35 @@ class Translator(object):
 
     def initTick(self, broker, accountID):
         if broker == 'backtest':
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = pd.DataFrame(None)
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = pd.DataFrame(None)
+            firstTickT = pd.to_datetime(
+                str(cfg.brokerList['backtest']['iYear']) + '-' + str(cfg.brokerList['backtest']['iMonth']))
             for pair in cfg.pairList:
                 filename = cfg.brokerList['backtest']['accounts'][accountID]['fileiter'][pair].__next__()
                 print(filename)
                 file = pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
                                    index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
                 file = file.groupby(file.index, sort=False).mean()
-                cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'], file], axis=1)
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].sort_index()
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].columns = \
-                pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].fillna(method='bfill',
-                                                                                           inplace=True)
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].dropna(inplace=True)
-            print('Processed tick table')
-            firstCandleT = pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']
-                                        .index.values[0] + pd.Timedelta(cfg.history['gran'])). \
-                floor(str(cfg.history['gran']) + 's')
-            cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = pd.DataFrame(None)
+                firstTickT = max(firstTickT, file.iloc[0].name)
+                cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = \
+                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable'], file], axis=1)
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].sort_index()
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].columns = \
+                pd.MultiIndex.from_product([cfg.pairList, ['ask', 'bid']])
+            firstTickT = firstTickT.floor(str(cfg.history['gran']) + 'S') + pd.to_timedelta(cfg.history['gran'],
+                                                                                            unit='S')
+            firstTickV = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[:firstTickT].fillna(
+                method='ffill', axis=0).iloc[-1]
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].drop(
+                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
+                    :(firstTickT - pd.to_timedelta(1))].index.values)
+            firstTickTHist = firstTickT + pd.to_timedelta(cfg.brokerList['backtest']['gran'], unit='S')
+            buff = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[:(firstTickTHist - pd.to_timedelta(1, unit='ns'))]
+            histB = pd.DataFrame(None)
             for pair in cfg.pairList:
-                cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'] = \
-                    pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'],
-                               cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'][pair]
-                              .agg('mean', axis=1).resample(str(cfg.history['gran']) + 'S', kind='period').
-                              ohlc()], axis=1)
-                print('Processed ' + pair + ' candles')
-            cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'].columns = \
-                pd.MultiIndex.from_product([cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'],
-                                            ['o', 'h', 'l', 'c']])
-            for p in cfg.pairList:
-                cfg.history['predInput'][p] = cfg.brokerList['backtest']['accounts'][accountID]['histTable']['table'][
-                                                  p].iloc[:(cfg.prediction['inputSize'])]
-            firstTickT = cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']. \
-                             loc[(firstCandleT + (cfg.prediction['inputSize'] + 1) * pd.Timedelta(str( \
-                cfg.history['gran']) + 's')):].index[0]
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].loc[firstTickT:]
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['iterator'] = \
-                cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].iterrows()
+                histB = pd.concat([histB, buff.loc[:, pair].agg('mean', axis=1).fillna(method='ffill').resample(str(cfg.history['gran']) + 'S').ohlc()], axis=1)
+            cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = histB
+            print(cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'])
 
         if broker == 'oanda':
             cfg.priceList['oanda']['accounts'][accountID] = pd.DataFrame(

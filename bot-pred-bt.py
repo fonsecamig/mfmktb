@@ -14,7 +14,7 @@ transl = td.Translator()
 strategy = stratg.TestPredictionStrategy(10, 0.01, 0.00025, 0.5)
 # dur = pd.Timedelta(seconds=5)
 
-transl.initAccount('backtest', 0, gran=5, btpath='/Users/fonsecamig/FXdata/raw/')
+transl.initAccount('backtest', 0, btpath='/Users/fonsecamig/FXdata/raw/')
 
 for broker in cfg.brokerList:
     for acc in range(cfg.brokerList[broker]['accounts'].__len__()):

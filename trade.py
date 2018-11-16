@@ -38,7 +38,7 @@ class Translator(object):
     def __init__(self):
         pass
 
-    def initAccount(self, broker, token, gran, iYear=2018, iMonth=1, fYear=2018, fMonth=3, btpath='./', btcurr='USD',
+    def initAccount(self, broker, token, iYear=2018, iMonth=1, fYear=2018, fMonth=3, btpath='./', btcurr='USD',
                     btamount=100000,
                     btmargin=0.02):
         if broker == 'backtest':  # Introduce pairs in config.py
@@ -47,7 +47,7 @@ class Translator(object):
                                           'iMonth': iMonth,
                                           'fYear': fYear,
                                           'fMonth': fMonth,
-                                          'gran': gran,
+                                          # 'gran': gran,
                                           'accounts': []}
             cfg.brokerList['backtest']['accounts'] = [{'ID': 0,
                                                        'filelist': dict(
@@ -383,15 +383,22 @@ class Translator(object):
                                                                                             unit='S')
             firstTickV = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[:firstTickT].fillna(
                 method='ffill', axis=0).iloc[-1]
+            firstTickT = firstTickV.name
+            firstTickT = firstTickT
+            buff = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
+                   firstTickT:(firstTickT + pd.to_timedelta((cfg.history['length'] + 1) * cfg.history['gran'],
+                                                            unit='S') - pd.to_timedelta(1))]
+            buff = buff.copy()
+            buff.loc[firstTickT] = firstTickV
+            cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = buff
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].drop(
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
-                    :(firstTickT - pd.to_timedelta(1))].index.values)
-            firstTickTHist = firstTickT + pd.to_timedelta(cfg.brokerList['backtest']['gran'], unit='S')
-            buff = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[:(firstTickTHist - pd.to_timedelta(1, unit='ns'))]
-            histB = pd.DataFrame(None)
+                cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
+                :(firstTickT - pd.to_timedelta(1))].index.values)
+            firstTickTHist = firstTickT + pd.to_timedelta(
+                (cfg.history['length'] + 1) * cfg.history['gran'], unit='S')
             for pair in cfg.pairList:
-                histB = pd.concat([histB, buff.loc[:, pair].agg('mean', axis=1).fillna(method='ffill').resample(str(cfg.history['gran']) + 'S').ohlc()], axis=1)
-            cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = histB
+                cfg.history['predInput'][pair] = buff.loc[:, pair].agg('mean', axis=1).fillna(method='ffill').resample(
+                    str(cfg.history['gran']) + 'S').ohlc()
             print(cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'])
 
         if broker == 'oanda':

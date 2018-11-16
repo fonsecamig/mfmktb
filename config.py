@@ -20,6 +20,7 @@ pairList = \
 posList = []
 priceList = {}
 history = {'gran': 5,
+           'length': 8,
            'predInput':
                {
                     'AUD/JPY': None,

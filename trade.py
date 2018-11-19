@@ -62,6 +62,9 @@ class Translator(object):
                                                        'curr': btcurr,
                                                        'initAmount': btamount,
                                                        'log': pd.DataFrame({'balance': [], 'NAV': []}, index=[])}]
+            cfg.priceList['backtest'] = {'accounts': [pd.DataFrame(
+                {'ask': cfg.pairList.__len__() * [None], 'bid': cfg.pairList.__len__() * [None],
+                 'ts': cfg.pairList.__len__() * [None]}, index=cfg.pairList)]}
             for pair in cfg.pairList:
                 lst = []
                 for year in range(cfg.brokerList['backtest']['iYear'], cfg.brokerList['backtest']['fYear'] + 1):
@@ -394,12 +397,13 @@ class Translator(object):
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].drop(
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
                 :(firstTickT - pd.to_timedelta(1))].index.values)
-            firstTickTHist = firstTickT + pd.to_timedelta(
-                (cfg.history['length'] + 1) * cfg.history['gran'], unit='S')
+            cfg.brokerList['backtest']['accounts'][accountID]['tickIter'] = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].iterrows()
             for pair in cfg.pairList:
                 cfg.history['predInput'][pair] = buff.loc[:, pair].agg('mean', axis=1).fillna(method='ffill').resample(
                     str(cfg.history['gran']) + 'S').ohlc()
-            print(cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'])
+                cfg.history['predInput'][pair].loc[:, 'close'] = cfg.history['predInput'][pair].loc[:, 'close'].fillna(
+                    method='ffill')
+                cfg.history['predInput'][pair] = cfg.history['predInput'][pair].fillna(method='bfill', axis=1)
 
         if broker == 'oanda':
             cfg.priceList['oanda']['accounts'][accountID] = pd.DataFrame(
@@ -474,30 +478,6 @@ class Translator(object):
                 except StopIteration:
                     pass
 
-            # if cfg.brokerList['backtest']['accounts'][accountID]['psv'] != []:
-            #     fN = pd.Series([pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']) for file in
-            #          cfg.brokerList['backtest']['accounts'][accountID]['buffer']], index=cfg.brokerList['backtest']['filelist']).idxmin()
-            #     try:
-            #         cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fN] = cfg.brokerList['backtest']['accounts'][accountID]['psv'][fN].__next__()
-            #         fNP = pd.Series(
-            #             [pd.Timestamp(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][file]['date']) for
-            #              file in
-            #              cfg.brokerList['backtest']['accounts'][accountID]['buffer']],
-            #             index=cfg.brokerList['backtest']['filelist']).idxmin()
-            #         cfg.priceList['backtest']['accounts'][accountID].loc[cfg.dctInv['backtest'][
-            #             cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['pair']]] = \
-            #             {
-            #                 'ask': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['ask']),
-            #                 'bid': float(cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['bid']),
-            #                 'ts': pd.Timestamp(
-            #                     cfg.brokerList['backtest']['accounts'][accountID]['buffer'][fNP]['date'])
-            #             }
-            #         bal = cfg.brokerList['backtest']['accounts'][accountID]['log'].iloc[-1,].balance
-            #         nav = bal + pd.Series([po.tick() for po in cfg.posList if po.status == 'o']).sum()
-            #         cfg.brokerList['backtest']['accounts'][accountID]['log'].loc[
-            #             cfg.priceList['backtest']['accounts'][accountID].ts.max()] = {'balance': bal, 'NAV': nav}
-            #     except StopIteration:
-            #         pass
         if broker == 'oanda':
             client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])
             parstreamtrans = \

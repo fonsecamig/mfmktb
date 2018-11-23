@@ -372,7 +372,6 @@ class Translator(object):
                 str(cfg.brokerList['backtest']['iYear']) + '-' + str(cfg.brokerList['backtest']['iMonth']))
             for pair in cfg.pairList:
                 filename = cfg.brokerList['backtest']['accounts'][accountID]['fileiter'][pair].__next__()
-                print(filename)
                 file = pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
                                    index_col=0, parse_dates=True, usecols=[1, 2, 3], header=None)
                 file = file.groupby(file.index, sort=False).mean()
@@ -390,14 +389,15 @@ class Translator(object):
             firstTickT = firstTickT
             buff = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
                    firstTickT:(firstTickT + pd.to_timedelta((cfg.history['length'] + 1) * cfg.history['gran'],
-                                                            unit='S') - pd.to_timedelta(1))]
+                                                            unit='S') - pd.to_timedelta(1))].fillna(method='ffill')
             buff = buff.copy()
             buff.loc[firstTickT] = firstTickV
             cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = buff
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].drop(
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
                 :(firstTickT - pd.to_timedelta(1))].index.values)
-            cfg.brokerList['backtest']['accounts'][accountID]['tickIter'] = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].iterrows()
+            cfg.brokerList['backtest']['accounts'][accountID]['tickIter'] = \
+                cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].iterrows()
             for pair in cfg.pairList:
                 cfg.history['predInput'][pair] = buff.loc[:, pair].agg('mean', axis=1).fillna(method='ffill').resample(
                     str(cfg.history['gran']) + 'S').ohlc()
@@ -447,36 +447,33 @@ class Translator(object):
 
     def tick(self, broker, accountID):
         if broker == 'backtest':
-            lastLine = pd.DataFrame(cfg.brokerList['backtest']['accounts'][accountID]['tickTable'][
-                                        'iterator']).transpose
             try:
-                t, nextPriceTable = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'][
-                    'iterator'].__next__()
-                cfg.priceList['backtest']['accounts'][accountID] = pd.concat(
-                    [pd.DataFrame(cfg.pairList.__len__() * [t], index=cfg.pairList),
-                     pd.DataFrame(np.array(nextPriceTable).reshape(cfg.pairList.__len__(), 2), index=cfg.pairList,
-                                  columns=['bid', 'ask'])], axis=1)
-                if t > cfg.history['predInput'].iloc[-1, :] + pd.Timedelta(cfg.history['gran']):
-                    for p in cfg.pairList:
-                        cfg.history['predInput'][p] = pd.concat([cfg.history['predInput'][p].loc[1:], ])
+                t, row = cfg.brokerList['backtest']['accounts'][accountID]['tickIter'].__next__()
+                newRow = {}
+                for pair in cfg.pairList:
+                    if not pd.isna(row.loc[pair, 'ask']) and not pd.isna(row.loc[pair, 'bid']):
+                        cfg.priceList['backtest']['accounts'][accountID].loc[pair] = {'ask': row.loc[pair, 'ask'],
+                                                                                      'bid': row.loc[pair, 'bid'],
+                                                                                      'ts': t}
+                        newRow[pair] = (row.loc[pair, 'ask'] + row.loc[pair, 'bid']) / 2
+                firstCandleT = t.floor(str(cfg.history['gran']) + 'S') - cfg.history['length'] * pd.to_timedelta(
+                    cfg.history['gran'], unit='S')
+                if cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1].name < firstCandleT:
+                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[firstCandleT] = \
+                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1]
+                cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = \
+                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].fillna(method='ffill')
+                cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].drop(
+                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[
+                    :(firstCandleT - pd.to_timedelta(1))].index.values)
+                for pair in cfg.pairList:
+                    cfg.history['predInput'][pair] = cfg.brokerList['backtest']['accounts'][accountID][
+                                                         'histBuffer'].loc[firstCandleT:(
+                                firstCandleT + (cfg.history['length'] + 1) * pd.to_timedelta(cfg.history['gran'],
+                                                                                             unit='S')), pair].resample(
+                        str(cfg.history['gran']) + 'S').ohlc()
             except StopIteration:
-                try:
-                    for pair in cfg.pairList:
-                        filename = cfg.brokerList['backtest']['accounts'][0]['filelist'][pair]['iterator'].__next__()
-                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                            pd.concat([cfg.brokerList['accounts'][accountID]['tickTable']['table'],
-                                       pd.read_csv(os.path.join(cfg.brokerList['backtest']['path'], filename),
-                                                   index_col=1, parse_dates=True, usecols=[2, 3])], axis=1, sort=True)
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].columns = \
-                        pd.MultiIndex.from_product([cfg.pairList, ['bid', 'ask']])
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = pd.concat(
-                        [lastLine, cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table']])
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].fillna(method='bfill',
-                                                                                                   inplace=True)
-                    cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'] = \
-                        cfg.brokerList['backtest']['accounts'][accountID]['tickTable']['table'].iloc[0:, :]
-                except StopIteration:
-                    pass
+                pass
 
         if broker == 'oanda':
             client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])

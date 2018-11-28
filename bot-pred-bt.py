@@ -24,19 +24,17 @@ for broker in cfg.brokerList:
 
 # strategy.initiate()
 # timeStop = pd.Timestamp.now(tz='utc') + dur
-while True:
+n = -1
+for _ in range(5):
+    n =+ 1
     for broker in cfg.brokerList:
         for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
-            try:
                 transl.tick(broker, acc)
                 print(cfg.priceList[broker]['accounts'][acc])
+                # print(cfg.history)
                 # print([p.log for p in cfg.posList])
                 # print(strategy.advice())
                 # transl.execute(strategy.advice())
-            except (ConnectionResetError, requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                    requests.exceptions.HTTPError, requests.exceptions.ChunkedEncodingError):
-                transl.initPosLog(broker, acc)
-                transl.initTick(broker, acc)
 #
 # posLogL = [p.log for p in cfg.posList]
 # posLog = pd.concat(posLogL, keys=list(range(1, posLogL.__len__() + 1)))

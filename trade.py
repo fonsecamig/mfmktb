@@ -378,24 +378,21 @@ class Translator(object):
                 firstTickT = max(firstTickT, file.iloc[0].name)
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = \
                     pd.concat([cfg.brokerList['backtest']['accounts'][accountID]['tickTable'], file], axis=1)
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].sort_index()
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].sort_index(inplace=True)
             cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].columns = \
                 pd.MultiIndex.from_product([cfg.pairList, ['ask', 'bid']])
-            firstTickT = firstTickT.floor(str(cfg.history['gran']) + 'S') + pd.to_timedelta(cfg.history['gran'],
-                                                                                            unit='S')
+            firstTickT = firstTickT.ceil(str(cfg.history['gran']) + 'S')
             firstTickV = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[:firstTickT].fillna(
                 method='ffill', axis=0).iloc[-1]
-            firstTickT = firstTickV.name
-            firstTickT = firstTickT
             buff = cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
-                   firstTickT:(firstTickT + pd.to_timedelta((cfg.history['length'] + 1) * cfg.history['gran'],
+                   firstTickT:(firstTickT + pd.to_timedelta(cfg.history['length'] * cfg.history['gran'],
                                                             unit='S') - pd.to_timedelta(1))].fillna(method='ffill')
-            buff = buff.copy()
             buff.loc[firstTickT] = firstTickV
+            buff.sort_index(inplace=True)
             cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = buff
-            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].drop(
-                cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[
-                :(firstTickT - pd.to_timedelta(1))].index.values)
+            firstTickT = firstTickT + cfg.history['length'] * pd.to_timedelta(cfg.history['gran'], unit='S')
+            cfg.brokerList['backtest']['accounts'][accountID]['tickTable'] = \
+                cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].loc[firstTickT:]
             cfg.brokerList['backtest']['accounts'][accountID]['tickIter'] = \
                 cfg.brokerList['backtest']['accounts'][accountID]['tickTable'].iterrows()
             for pair in cfg.pairList:
@@ -404,6 +401,8 @@ class Translator(object):
                 cfg.history['predInput'][pair].loc[:, 'close'] = cfg.history['predInput'][pair].loc[:, 'close'].fillna(
                     method='ffill')
                 cfg.history['predInput'][pair] = cfg.history['predInput'][pair].fillna(method='bfill', axis=1)
+            while None in list(cfg.priceList['backtest']['accounts'][0].ts):
+                self.tick(broker, accountID)
 
         if broker == 'oanda':
             cfg.priceList['oanda']['accounts'][accountID] = pd.DataFrame(
@@ -449,31 +448,34 @@ class Translator(object):
         if broker == 'backtest':
             try:
                 t, row = cfg.brokerList['backtest']['accounts'][accountID]['tickIter'].__next__()
-                newRow = {}
                 for pair in cfg.pairList:
                     if not pd.isna(row.loc[pair, 'ask']) and not pd.isna(row.loc[pair, 'bid']):
                         cfg.priceList['backtest']['accounts'][accountID].loc[pair] = {'ask': row.loc[pair, 'ask'],
                                                                                       'bid': row.loc[pair, 'bid'],
                                                                                       'ts': t}
-                        newRow[pair] = (row.loc[pair, 'ask'] + row.loc[pair, 'bid']) / 2
                 firstCandleT = t.floor(str(cfg.history['gran']) + 'S') - cfg.history['length'] * pd.to_timedelta(
                     cfg.history['gran'], unit='S')
                 if cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1].name < firstCandleT:
                     cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[firstCandleT] = \
                         cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1]
+                cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[t] = row
                 cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = \
                     cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].fillna(method='ffill')
                 cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].drop(
                     cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[
-                    :(firstCandleT - pd.to_timedelta(1))].index.values)
+                    :(firstCandleT - pd.to_timedelta(1))].index.values, inplace=True)
                 for pair in cfg.pairList:
                     cfg.history['predInput'][pair] = cfg.brokerList['backtest']['accounts'][accountID][
                                                          'histBuffer'].loc[firstCandleT:(
                                 firstCandleT + (cfg.history['length'] + 1) * pd.to_timedelta(cfg.history['gran'],
-                                                                                             unit='S')), pair].resample(
-                        str(cfg.history['gran']) + 'S').ohlc()
+                                                                                             unit='S') - pd.to_timedelta(
+                            1)), pair].agg('mean', axis=1).resample(str(cfg.history['gran']) + 'S').ohlc()
+                    cfg.history['predInput'][pair].loc[:, 'close'] = cfg.history['predInput'][pair].loc[:,
+                                                                     'close'].fillna(method='ffill')
+                    cfg.history['predInput'][pair] = cfg.history['predInput'][pair].fillna(method='bfill', axis=1).iloc[:-1]
+                    return True
             except StopIteration:
-                pass
+                return False
 
         if broker == 'oanda':
             client = oandapyV20.API(access_token=cfg.brokerList['oanda']['token'])

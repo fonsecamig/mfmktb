@@ -455,25 +455,19 @@ class Translator(object):
                                                                                       'ts': t}
                 firstCandleT = t.floor(str(cfg.history['gran']) + 'S') - cfg.history['length'] * pd.to_timedelta(
                     cfg.history['gran'], unit='S')
-                if cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1].name < firstCandleT:
-                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[firstCandleT] = \
-                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1]
                 cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[t] = row
-                cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = \
-                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].fillna(method='ffill')
-                cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].drop(
-                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[
-                    :(firstCandleT - pd.to_timedelta(1))].index.values, inplace=True)
-                for pair in cfg.pairList:
-                    cfg.history['predInput'][pair] = cfg.brokerList['backtest']['accounts'][accountID][
-                                                         'histBuffer'].loc[firstCandleT:(
-                                firstCandleT + (cfg.history['length'] + 1) * pd.to_timedelta(cfg.history['gran'],
-                                                                                             unit='S') - pd.to_timedelta(
-                            1)), pair].agg('mean', axis=1).resample(str(cfg.history['gran']) + 'S').ohlc()
-                    cfg.history['predInput'][pair].loc[:, 'close'] = cfg.history['predInput'][pair].loc[:,
-                                                                     'close'].fillna(method='ffill')
-                    cfg.history['predInput'][pair] = cfg.history['predInput'][pair].fillna(method='bfill', axis=1).iloc[:-1]
-                    return True
+                if t.floor(str(cfg.history['gran']) + 'S') > \
+                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-2].name.floor(
+                                str(cfg.history['gran']) + 'S'):
+                    if cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-2].name < firstCandleT:
+                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[firstCandleT] = \
+                            cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-2]
+                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'] = \
+                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].fillna(method='ffill')
+                    cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].drop(
+                        cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].loc[
+                        :(firstCandleT - pd.to_timedelta(1))].index.values, inplace=True)
+                return True
             except StopIteration:
                 return False
 
@@ -537,6 +531,19 @@ class Translator(object):
                     print(candle)
                     priceH.loc[pd.Timestamp(candle["time"], tzinfo='UTC')] = candle["mid"]
             return (priceH)
+
+    def prediction(self, broker, accountID):
+        firstCandleT = cfg.brokerList['backtest']['accounts'][accountID]['histBuffer'].iloc[-1].name
+        for pair in cfg.pairList:
+            cfg.history['predInput'][pair] = cfg.brokerList['backtest']['accounts'][accountID][
+                                                 'histBuffer'].loc[firstCandleT:(
+                    firstCandleT + (cfg.history['length'] + 1) * pd.to_timedelta(cfg.history['gran'],
+                                                                                 unit='S') - pd.to_timedelta(
+                1)), pair].agg('mean', axis=1).resample(str(cfg.history['gran']) + 'S').ohlc()
+            cfg.history['predInput'][pair].loc[:, 'close'] = cfg.history['predInput'][pair].loc[:,
+                                                             'close'].fillna(method='ffill')
+            cfg.history['predInput'][pair] = cfg.history['predInput'][pair].fillna(method='bfill',
+                                                                                   axis=1).iloc[:-1]
 
     def execute(self, orders):
         for o in orders:

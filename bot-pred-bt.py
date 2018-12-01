@@ -24,12 +24,11 @@ for broker in cfg.brokerList:
 
 # strategy.initiate()
 # timeStop = pd.Timestamp.now(tz='utc') + dur
-n = -1
-for _ in range(5):
-    n =+ 1
+online = True
+while online:
     for broker in cfg.brokerList:
         for acc in range(cfg.brokerList[broker]['accounts'].__len__()):
-                transl.tick(broker, acc)
+                online = transl.tick(broker, acc)
                 print(cfg.priceList[broker]['accounts'][acc])
                 # print(cfg.history)
                 # print([p.log for p in cfg.posList])

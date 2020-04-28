@@ -21,7 +21,7 @@ import oandapyV20.endpoints.pricing as pricing
 
 print(sys.argv)
 
-chc = sys.argv[1]
+chc = 'streamprice' # sys.argv[1]
 
 api = API(access_token=access_token)
 

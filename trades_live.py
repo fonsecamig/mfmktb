@@ -21,7 +21,7 @@ import oandapyV20.endpoints.pricing as pricing
 
 print(sys.argv)
 
-chc = 'streamprice' # sys.argv[1]
+chc = 'streamtrans' # sys.argv[1]
 
 api = API(access_token=access_token)
 
@@ -99,7 +99,7 @@ if chc == 'streamtrans':
     params = {"instruments": "EUR_USD,EUR_JPY"}
     r = trans.TransactionsStream(accountID=accountID)
     rv = api.request(r)
-    maxrecs = 5
+    maxrecs = 5000
     try:
         for T in r.response:  # or rv ...
             print(json.dumps(T, indent=4), ",")
